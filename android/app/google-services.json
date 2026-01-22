@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "169009471817",
+    "project_id": "samurais-job",
+    "storage_bucket": "samurais-job.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:169009471817:android:ad7e1e90b4e09c4792ba98",
+        "android_client_info": {
+          "package_name": "com.samurais.samurais_job"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDE4YJ1L24FJH7Y_T3D2Yo0DC4R1OHStGQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:169009471817:android:76b46358a7a62b0592ba98",
+        "android_client_info": {
+          "package_name": "com.samuraisjob.samurais_job"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDE4YJ1L24FJH7Y_T3D2Yo0DC4R1OHStGQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
