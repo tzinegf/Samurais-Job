@@ -6,4 +6,6 @@ abstract class Routes {
   static const DASHBOARD_PROFESSIONAL = '/dashboard-professional';
   static const DASHBOARD_ADMIN = '/dashboard-admin';
   static const DASHBOARD_MODERATOR = '/dashboard-moderator';
+  static const CHAT = '/chat';
+  static const HISTORY = '/history';
 }

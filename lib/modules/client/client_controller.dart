@@ -102,11 +102,108 @@ class ClientController extends GetxController {
       titleCtrl.clear();
       descriptionCtrl.clear();
       priceCtrl.clear();
-      selectedCategory.value = categories.first;
     } catch (e) {
-      Get.snackbar("Erro", "Erro ao criar solicitação: $e");
+      Get.snackbar("Erro ao criar solicitação", e.toString());
     } finally {
       isLoading.value = false;
     }
+  }
+
+  void updateRequest(String requestId) async {
+    if (titleCtrl.text.isEmpty || descriptionCtrl.text.isEmpty) {
+      Get.snackbar("Erro", "Preencha título e descrição.");
+      return;
+    }
+
+    try {
+      isLoading.value = true;
+      double? price = double.tryParse(priceCtrl.text.replaceAll(',', '.'));
+
+      Map<String, dynamic> data = {
+        'title': titleCtrl.text.trim(),
+        'description': descriptionCtrl.text.trim(),
+        'category': selectedCategory.value,
+        'price': price,
+      };
+
+      await _db.collection('service_requests').doc(requestId).update(data);
+
+      Get.back(); // Close dialog
+      Get.back(); // Close details bottom sheet if open (optional, depending on flow)
+      Get.snackbar("Sucesso", "Solicitação atualizada com sucesso!");
+
+      // Clear fields
+      titleCtrl.clear();
+      descriptionCtrl.clear();
+      priceCtrl.clear();
+    } catch (e) {
+      Get.snackbar("Erro ao atualizar solicitação", e.toString());
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  void deleteRequest(String requestId) async {
+    try {
+      isLoading.value = true;
+      await _db.collection('service_requests').doc(requestId).delete();
+      Get.back(); // Close details bottom sheet
+      Get.snackbar("Sucesso", "Solicitação excluída com sucesso!");
+    } catch (e) {
+      Get.snackbar("Erro ao excluir solicitação", e.toString());
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  void finishRequest({
+    required String requestId,
+    required double rating,
+    required String review,
+    required bool hasProblem,
+    String? problemDescription,
+  }) async {
+    try {
+      isLoading.value = true;
+      
+      Map<String, dynamic> data = {
+        'status': 'completed',
+        'completedAt': FieldValue.serverTimestamp(),
+        'rating': rating,
+        'review': review,
+        'hasProblem': hasProblem,
+        'problemDescription': problemDescription,
+      };
+
+      await _db.collection('service_requests').doc(requestId).update(data);
+      
+      // Update professional's coins/rating (logic to be added later if needed)
+      // For now just update the request.
+
+      Get.back(); // Close dialog
+      Get.back(); // Close details bottom sheet
+      Get.snackbar("Sucesso", "Serviço finalizado e avaliado com sucesso!");
+    } catch (e) {
+      Get.snackbar("Erro ao finalizar serviço", e.toString());
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getProfessionalDetails(
+    String professionalId,
+  ) async {
+    try {
+      DocumentSnapshot doc = await _db
+          .collection('users')
+          .doc(professionalId)
+          .get();
+      if (doc.exists) {
+        return doc.data() as Map<String, dynamic>;
+      }
+    } catch (e) {
+      print("Erro ao buscar profissional: $e");
+    }
+    return null;
   }
 }

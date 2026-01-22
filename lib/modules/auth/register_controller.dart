@@ -14,7 +14,7 @@ class RegisterController extends GetxController {
 
   final RxString selectedRole = 'client'.obs;
   final RxList<String> selectedSkills = <String>[].obs;
-  
+
   final List<String> availableSkills = [
     'Marceneiro',
     'Encanador',
@@ -43,7 +43,10 @@ class RegisterController extends GetxController {
   }
 
   void register() {
-    if (nameCtrl.text.isEmpty || emailCtrl.text.isEmpty || passwordCtrl.text.isEmpty || phoneCtrl.text.isEmpty) {
+    if (nameCtrl.text.isEmpty ||
+        emailCtrl.text.isEmpty ||
+        passwordCtrl.text.isEmpty ||
+        phoneCtrl.text.isEmpty) {
       Get.snackbar("Erro", "Preencha todos os campos obrigatórios.");
       return;
     }
@@ -58,11 +61,11 @@ class RegisterController extends GetxController {
       name: nameCtrl.text.trim(),
       role: selectedRole.value,
       phone: phoneCtrl.text.trim(),
-      skills: selectedRole.value == 'professional' ? selectedSkills.toList() : null,
+      skills: selectedRole.value == 'professional'
+          ? selectedSkills.toList()
+          : null,
       bio: selectedRole.value == 'professional' ? bioCtrl.text.trim() : null,
       coins: 0,
-      points: 0,
-      level: 'Bronze',
     );
 
     _authController.registerUser(newUser, passwordCtrl.text);

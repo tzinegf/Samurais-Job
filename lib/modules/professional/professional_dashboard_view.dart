@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 import '../../models/service_request_model.dart';
+import '../../routes/app_routes.dart';
 import 'professional_controller.dart';
 import '../auth/auth_controller.dart';
 
@@ -30,6 +32,11 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
                 ],
               );
             }),
+            IconButton(
+              icon: Icon(Icons.history),
+              onPressed: () => Get.toNamed(Routes.HISTORY),
+              tooltip: 'Histórico',
+            ),
             IconButton(
               icon: Icon(Icons.refresh),
               onPressed: () => controller.fetchAvailableRequests(),
@@ -66,86 +73,94 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ),
-            Text(
-              request.title,
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 8),
-            Row(
-              children: [
-                Chip(label: Text(request.category)),
-                SizedBox(width: 8),
-                Text(
-                  'R\$ ${request.price?.toStringAsFixed(2) ?? 'A combinar'}',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 16),
-            Text(
-              'Descrição:',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            SizedBox(height: 8),
-            Text(
-              request.description,
-              style: TextStyle(fontSize: 14, color: Colors.black87),
-            ),
-            SizedBox(height: 24),
-            if (request.status == 'pending')
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Get.back();
-                    controller.acceptRequest(request);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  icon: Icon(Icons.lock_open),
-                  label: Text('Aceitar (20 Moedas)'),
-                ),
-              )
-            else if (request.status == 'accepted')
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Get.back();
-                    Get.snackbar('Chat', 'Abrindo chat com o cliente...');
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  icon: Icon(Icons.chat),
-                  label: Text('Abrir Chat'),
-                ),
+              Text(
+                request.title,
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               ),
-          ],
+              SizedBox(height: 8),
+              Row(
+                children: [
+                  Chip(label: Text(request.category)),
+                  SizedBox(width: 8),
+                  Text(
+                    'R\$ ${request.price?.toStringAsFixed(2) ?? 'A combinar'}',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Descrição:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              SizedBox(height: 8),
+              Text(
+                request.description,
+                style: TextStyle(fontSize: 14, color: Colors.black87),
+              ),
+              SizedBox(height: 24),
+              if (request.status == 'pending')
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Get.back();
+                      controller.acceptRequest(request);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    icon: Icon(Icons.lock_open),
+                    label: Text('Aceitar (20 Moedas)'),
+                  ),
+                )
+              else if (request.status == 'accepted')
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Get.back();
+                      Get.toNamed(
+                        Routes.CHAT,
+                        arguments: {
+                          'requestId': request.id,
+                          'requestTitle': request.title,
+                        },
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    icon: Icon(Icons.chat),
+                    label: Text('Abrir Chat'),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
       isScrollControlled: true,
@@ -180,77 +195,13 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
         );
       }
 
-      return Column(
-        children: [
-          // Padding(
-          //   padding: const EdgeInsets.all(8.0),
-          //   child: Text(
-          //     'Filtrando por: $skills',
-          //     style: TextStyle(fontSize: 12, color: Colors.grey),
-          //   ),
-          // ),
-          Expanded(
-            child: ListView.builder(
-              itemCount: controller.availableRequests.length,
-              padding: EdgeInsets.all(16),
-              itemBuilder: (context, index) {
-                final request = controller.availableRequests[index];
-                return Card(
-                  elevation: 3,
-                  margin: EdgeInsets.only(bottom: 16),
-                  child: InkWell(
-                    onTap: () => _showRequestDetails(request),
-                    child: Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Chip(label: Text(request.category)),
-                              Text(
-                                'R\$ ${request.price?.toStringAsFixed(2) ?? 'A combinar'}',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.green,
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            request.title,
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(request.description),
-                          SizedBox(height: 16),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: () =>
-                                  controller.acceptRequest(request),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
-                                foregroundColor: Colors.white,
-                              ),
-                              icon: Icon(Icons.lock_open, size: 18),
-                              label: Text('Aceitar (20 Moedas)'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
+      return ListView.builder(
+        itemCount: controller.availableRequests.length,
+        padding: EdgeInsets.all(16),
+        itemBuilder: (context, index) {
+          final request = controller.availableRequests[index];
+          return _buildServiceCard(request, isAvailable: true);
+        },
       );
     });
   }
@@ -266,19 +217,215 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
         padding: EdgeInsets.all(16),
         itemBuilder: (context, index) {
           final request = controller.myRequests[index];
-          return Card(
-            color: Colors.green.shade50,
-            elevation: 2,
-            margin: EdgeInsets.only(bottom: 16),
-            child: ListTile(
-              onTap: () => _showRequestDetails(request),
-              title: Text(request.title),
-              subtitle: Text(request.status.toUpperCase()),
-              trailing: Icon(Icons.check_circle, color: Colors.green),
-            ),
-          );
+          return _buildServiceCard(request, isAvailable: false);
         },
       );
     });
+  }
+
+  Widget _buildServiceCard(
+    ServiceRequestModel request, {
+    required bool isAvailable,
+  }) {
+    return Card(
+      elevation: 4,
+      margin: EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: () => _showRequestDetails(request),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          _getIconForCategory(request.category),
+                          color: Colors.blue,
+                          size: 20,
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        request.category,
+                        style: TextStyle(
+                          color: Colors.grey[700],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (!isAvailable)
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _getStatusColor(request.status).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _getStatusColor(
+                            request.status,
+                          ).withOpacity(0.5),
+                        ),
+                      ),
+                      child: Text(
+                        _translateStatus(request.status),
+                        style: TextStyle(
+                          color: _getStatusColor(request.status),
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              SizedBox(height: 12),
+              Text(
+                request.title,
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 4),
+              Text(
+                request.createdAt != null
+                    ? 'Criado em ${DateFormat('dd/MM/yyyy HH:mm').format(request.createdAt!)}'
+                    : 'Data desconhecida',
+                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              ),
+              SizedBox(height: 8),
+              Text(
+                request.description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: Colors.grey[800], height: 1.3),
+              ),
+              SizedBox(height: 12),
+              Divider(),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    (request.price != null && request.price! > 0)
+                        ? 'R\$ ${request.price!.toStringAsFixed(2)}'
+                        : 'A combinar',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: (request.price != null && request.price! > 0)
+                          ? Colors.green[700]
+                          : Colors.grey,
+                    ),
+                  ),
+                  if (isAvailable)
+                    ElevatedButton.icon(
+                      onPressed: () => controller.acceptRequest(request),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        textStyle: TextStyle(fontSize: 12),
+                      ),
+                      icon: Icon(Icons.lock_open, size: 16),
+                      label: Text('Aceitar'),
+                    )
+                  else if (request.status == 'accepted')
+                    ElevatedButton.icon(
+                      onPressed: () => Get.toNamed(
+                        Routes.CHAT,
+                        arguments: {
+                          'requestId': request.id,
+                          'requestTitle': request.title,
+                        },
+                      ),
+                      icon: Icon(Icons.chat, size: 16),
+                      label: Text('Chat'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        textStyle: TextStyle(fontSize: 12),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  IconData _getIconForCategory(String category) {
+    switch (category) {
+      case 'Marceneiro':
+        return Icons.carpenter;
+      case 'Encanador':
+        return Icons.plumbing;
+      case 'Pedreiro':
+        return Icons.construction;
+      case 'Eletricista':
+        return Icons.electric_bolt;
+      case 'Pintor':
+        return Icons.format_paint;
+      case 'Jardinagem':
+        return Icons.grass;
+      case 'Limpeza':
+        return Icons.cleaning_services;
+      case 'Mecânico':
+        return Icons.car_repair;
+      case 'Informática':
+        return Icons.computer;
+      case 'Costureira':
+        return Icons.cut;
+      case 'Cozinheiro':
+        return Icons.restaurant;
+      default:
+        return Icons.handyman;
+    }
+  }
+
+  String _translateStatus(String status) {
+    switch (status) {
+      case 'pending':
+        return 'Pendente';
+      case 'accepted':
+        return 'Aceito';
+      case 'completed':
+        return 'Concluído';
+      case 'cancelled':
+        return 'Cancelado';
+      default:
+        return status;
+    }
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'pending':
+        return Colors.orange;
+      case 'accepted':
+        return Colors.blue;
+      case 'completed':
+        return Colors.green;
+      case 'cancelled':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
   }
 }

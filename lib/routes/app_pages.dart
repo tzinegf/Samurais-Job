@@ -9,6 +9,10 @@ import '../modules/moderator/moderator_dashboard_view.dart';
 import '../modules/professional/professional_binding.dart';
 import '../modules/client/client_binding.dart';
 import '../modules/auth/register_binding.dart';
+import '../modules/chat/chat_binding.dart';
+import '../modules/chat/chat_view.dart';
+import '../modules/history/history_binding.dart';
+import '../modules/history/history_view.dart';
 import 'app_routes.dart';
 
 class AppPages {
@@ -35,6 +39,12 @@ class AppPages {
     GetPage(
       name: Routes.DASHBOARD_MODERATOR,
       page: () => ModeratorDashboardView(),
+    ),
+    GetPage(name: Routes.CHAT, page: () => ChatView(), binding: ChatBinding()),
+    GetPage(
+      name: Routes.HISTORY,
+      page: () => HistoryView(),
+      binding: HistoryBinding(),
     ),
   ];
 }

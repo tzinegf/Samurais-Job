@@ -10,6 +10,11 @@ class ServiceRequestModel {
   String status; // pending, accepted, completed, cancelled
   double? price;
   DateTime? createdAt;
+  DateTime? completedAt;
+  double? rating;
+  String? review;
+  bool? hasProblem;
+  String? problemDescription;
 
   ServiceRequestModel({
     this.id,
@@ -21,6 +26,11 @@ class ServiceRequestModel {
     this.status = 'pending',
     this.price,
     this.createdAt,
+    this.completedAt,
+    this.rating,
+    this.review,
+    this.hasProblem,
+    this.problemDescription,
   });
 
   factory ServiceRequestModel.fromDocument(DocumentSnapshot doc) {
@@ -33,10 +43,17 @@ class ServiceRequestModel {
       description: data['description'] ?? 'Sem Descrição',
       category: data['category'] ?? 'Outros',
       status: data['status'] ?? 'pending',
-      price: (data['price'] is int) 
-          ? (data['price'] as int).toDouble() 
+      price: (data['price'] is int)
+          ? (data['price'] as int).toDouble()
           : (data['price'] ?? 0.0).toDouble(),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+      completedAt: (data['completedAt'] as Timestamp?)?.toDate(),
+      rating: (data['rating'] is int)
+          ? (data['rating'] as int).toDouble()
+          : (data['rating'] as double?),
+      review: data['review'],
+      hasProblem: data['hasProblem'],
+      problemDescription: data['problemDescription'],
     );
   }
 
@@ -50,6 +67,11 @@ class ServiceRequestModel {
       'status': status,
       'price': price,
       'createdAt': createdAt ?? FieldValue.serverTimestamp(),
+      'completedAt': completedAt,
+      'rating': rating,
+      'review': review,
+      'hasProblem': hasProblem,
+      'problemDescription': problemDescription,
     };
   }
 }
