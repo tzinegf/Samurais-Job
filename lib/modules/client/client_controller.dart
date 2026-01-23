@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../models/service_request_model.dart';
 import '../auth/auth_controller.dart';
 
@@ -12,6 +14,7 @@ class ClientController extends GetxController {
   final descriptionCtrl = TextEditingController();
   final priceCtrl = TextEditingController();
   RxString selectedCategory = ''.obs;
+  Rx<LatLng?> selectedLocation = Rx<LatLng?>(null); // New location field
   RxList<ServiceRequestModel> myRequests = <ServiceRequestModel>[].obs;
   RxBool isLoading = false.obs;
 
@@ -68,6 +71,45 @@ class ClientController extends GetxController {
         );
   }
 
+  Future<void> getCurrentLocation() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    // Test if location services are enabled.
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      Get.snackbar('Erro', 'Serviços de localização desativados.');
+      return;
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        Get.snackbar('Erro', 'Permissão de localização negada.');
+        return;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      Get.snackbar('Erro',
+          'Permissões de localização permanentemente negadas. Não podemos solicitar permissões.');
+      return;
+    }
+
+    // When we reach here, permissions are granted and we can
+    // continue accessing the position of the device.
+    try {
+      isLoading.value = true;
+      Position position = await Geolocator.getCurrentPosition();
+      selectedLocation.value = LatLng(position.latitude, position.longitude);
+    } catch (e) {
+      Get.snackbar('Erro', 'Erro ao obter localização: $e');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   void createRequest() async {
     if (titleCtrl.text.isEmpty || descriptionCtrl.text.isEmpty) {
       Get.snackbar("Erro", "Preencha título e descrição.");
@@ -91,6 +133,8 @@ class ClientController extends GetxController {
         category: selectedCategory.value,
         price: price,
         status: 'pending',
+        latitude: selectedLocation.value?.latitude,
+        longitude: selectedLocation.value?.longitude,
       );
 
       await _db.collection('service_requests').add(newRequest.toJson());
@@ -102,6 +146,7 @@ class ClientController extends GetxController {
       titleCtrl.clear();
       descriptionCtrl.clear();
       priceCtrl.clear();
+      selectedLocation.value = null;
     } catch (e) {
       Get.snackbar("Erro ao criar solicitação", e.toString());
     } finally {

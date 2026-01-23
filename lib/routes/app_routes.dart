@@ -8,4 +8,5 @@ abstract class Routes {
   static const DASHBOARD_MODERATOR = '/dashboard-moderator';
   static const CHAT = '/chat';
   static const HISTORY = '/history';
+  static const BUY_COINS = '/buy-coins';
 }

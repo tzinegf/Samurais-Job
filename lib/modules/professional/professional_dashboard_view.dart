@@ -6,6 +6,7 @@ import '../../routes/app_routes.dart';
 import '../history/history_view.dart';
 import 'professional_controller.dart';
 import '../auth/auth_controller.dart';
+import '../shared/mini_map_viewer.dart';
 
 class ProfessionalDashboardView extends GetView<ProfessionalController> {
   @override
@@ -107,6 +108,18 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
                 request.description,
                 style: TextStyle(fontSize: 14, color: Colors.black87),
               ),
+              if (request.latitude != null && request.longitude != null) ...[
+                SizedBox(height: 16),
+                Text(
+                  'Localização:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                SizedBox(height: 8),
+                MiniMapViewer(
+                  latitude: request.latitude!,
+                  longitude: request.longitude!,
+                ),
+              ],
               SizedBox(height: 24),
               if (request.status == 'pending')
                 SizedBox(
@@ -685,28 +698,32 @@ class _ProfessionalHeader extends StatelessWidget {
                     ],
                   ),
                 ),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.monetization_on,
-                        color: Colors.amber,
-                        size: 20,
-                      ),
-                      SizedBox(width: 4),
-                      Text(
-                        '${user.coins}',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
+                InkWell(
+                  onTap: () => Get.toNamed(Routes.BUY_COINS),
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.monetization_on,
+                          color: Colors.amber,
+                          size: 20,
                         ),
-                      ),
-                    ],
+                        SizedBox(width: 4),
+                        Text(
+                          '${user.coins}',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -780,11 +797,11 @@ class _ProfessionalDrawer extends StatelessWidget {
               ),
               ListTile(
                 leading: Icon(Icons.monetization_on),
-                title: Text('Moedas'),
+                title: Text('Moedas (Comprar)'),
                 trailing: Text('${user?.coins ?? 0}'),
                 onTap: () {
                   Get.back();
-                  professionalController.addCoins(100);
+                  Get.toNamed(Routes.BUY_COINS);
                 },
               ),
               ListTile(

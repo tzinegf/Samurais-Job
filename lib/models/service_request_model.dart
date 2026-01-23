@@ -22,6 +22,10 @@ class ServiceRequestModel {
   bool? professionalHasProblem;
   String? professionalProblemDescription;
 
+  // Location
+  double? latitude;
+  double? longitude;
+
   ServiceRequestModel({
     this.id,
     required this.clientId,
@@ -41,6 +45,8 @@ class ServiceRequestModel {
     this.clientReview,
     this.professionalHasProblem,
     this.professionalProblemDescription,
+    this.latitude,
+    this.longitude,
   });
 
   factory ServiceRequestModel.fromDocument(DocumentSnapshot doc) {
@@ -70,6 +76,12 @@ class ServiceRequestModel {
       clientReview: data['clientReview'],
       professionalHasProblem: data['professionalHasProblem'],
       professionalProblemDescription: data['professionalProblemDescription'],
+      latitude: (data['latitude'] is int)
+          ? (data['latitude'] as int).toDouble()
+          : (data['latitude'] as double?),
+      longitude: (data['longitude'] is int)
+          ? (data['longitude'] as int).toDouble()
+          : (data['longitude'] as double?),
     );
   }
 
@@ -92,6 +104,8 @@ class ServiceRequestModel {
       'clientReview': clientReview,
       'professionalHasProblem': professionalHasProblem,
       'professionalProblemDescription': professionalProblemDescription,
+      'latitude': latitude,
+      'longitude': longitude,
     };
   }
 }

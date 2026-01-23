@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:latlong2/latlong.dart';
 import '../../models/service_request_model.dart';
 import '../../routes/app_routes.dart';
 import '../history/history_view.dart';
 import '../auth/auth_controller.dart';
 import 'client_controller.dart';
+import '../shared/location_picker_view.dart';
+import '../shared/mini_map_viewer.dart';
 
 class ClientDashboardView extends GetView<ClientController> {
   @override
@@ -330,6 +333,19 @@ class ClientDashboardView extends GetView<ClientController> {
                 style: TextStyle(fontSize: 14, color: Colors.black87),
               ),
 
+              if (request.latitude != null && request.longitude != null) ...[
+                SizedBox(height: 16),
+                Text(
+                  'Localização:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                SizedBox(height: 8),
+                MiniMapViewer(
+                  latitude: request.latitude!,
+                  longitude: request.longitude!,
+                ),
+              ],
+
               if (request.status == 'accepted' &&
                   request.professionalId != null) ...[
                 SizedBox(height: 24),
@@ -459,6 +475,10 @@ class ClientDashboardView extends GetView<ClientController> {
     controller.descriptionCtrl.clear();
     controller.priceCtrl.clear();
     controller.selectedCategory.value = controller.categories.first;
+    controller.selectedLocation.value = null;
+
+    // Auto-fetch location
+    controller.getCurrentLocation();
 
     Get.dialog(
       Dialog(
@@ -521,6 +541,57 @@ class ClientDashboardView extends GetView<ClientController> {
                   ),
                   keyboardType: TextInputType.numberWithOptions(decimal: true),
                 ),
+                SizedBox(height: 16),
+                Obx(() {
+                  final loc = controller.selectedLocation.value;
+                  return Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () async {
+                                final result = await Get.to(
+                                  () => LocationPickerView(
+                                    initialLocation:
+                                        controller.selectedLocation.value,
+                                  ),
+                                );
+                                if (result != null && result is LatLng) {
+                                  controller.selectedLocation.value = result;
+                                }
+                              },
+                              icon: Icon(Icons.map),
+                              label: Text(
+                                loc == null ? 'Abrir Mapa' : 'Alterar no Mapa',
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: loc == null
+                                    ? Colors.grey[200]
+                                    : Colors.green[100],
+                                foregroundColor: loc == null
+                                    ? Colors.black87
+                                    : Colors.green[800],
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          IconButton(
+                            onPressed: () => controller.getCurrentLocation(),
+                            icon: Icon(Icons.my_location),
+                            tooltip: 'Usar localização atual',
+                            color: Colors.blue,
+                          ),
+                        ],
+                      ),
+                      if (loc != null)
+                        Text(
+                          'Lat: ${loc.latitude.toStringAsFixed(4)}, Lng: ${loc.longitude.toStringAsFixed(4)}',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                    ],
+                  );
+                }),
                 SizedBox(height: 24),
                 Obx(
                   () => controller.isLoading.value

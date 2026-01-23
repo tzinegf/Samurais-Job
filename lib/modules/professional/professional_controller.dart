@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/service_request_model.dart';
@@ -168,6 +169,35 @@ class ProfessionalController extends GetxController {
       Get.snackbar('Moedas Adicionadas', 'Você recebeu $amount moedas!');
     } catch (e) {
       Get.snackbar('Erro', 'Falha ao adicionar moedas: $e');
+    }
+  }
+
+  Future<void> simulatePurchase(int coins, double price) async {
+    try {
+      Get.dialog(
+        Center(child: CircularProgressIndicator()),
+        barrierDismissible: false,
+      );
+
+      // Simulate network delay
+      await Future.delayed(Duration(seconds: 2));
+
+      Get.back(); // Close loading
+
+      // Here we would integrate with Mercado Pago
+      // For now, we assume success
+      await addCoins(coins);
+
+      Get.snackbar(
+        'Compra Realizada',
+        'Pagamento de R\$ ${price.toStringAsFixed(2)} confirmado!',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        duration: Duration(seconds: 4),
+      );
+    } catch (e) {
+      Get.back(); // Close loading if error
+      Get.snackbar('Erro', 'Falha no pagamento: $e');
     }
   }
 
