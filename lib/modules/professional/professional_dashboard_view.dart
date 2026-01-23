@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../../models/service_request_model.dart';
 import '../../routes/app_routes.dart';
+import '../history/history_view.dart';
 import 'professional_controller.dart';
 import '../auth/auth_controller.dart';
 
@@ -10,62 +11,50 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
-        appBar: AppBar(
-          title: Text('Painel do Profissional'),
-          actions: [
-            // Coins Display
-            Obx(() {
-              final coins =
-                  Get.find<AuthController>().currentUser.value?.coins ?? 0;
-              return Row(
-                children: [
-                  Icon(Icons.monetization_on, color: Colors.amber),
-                  SizedBox(width: 4),
-                  Text('$coins', style: TextStyle(fontWeight: FontWeight.bold)),
-                  IconButton(
-                    icon: Icon(Icons.add_circle_outline, color: Colors.green),
-                    tooltip: 'Comprar Moedas (Demo)',
-                    onPressed: () => controller.addCoins(100),
+        drawer: _ProfessionalDrawer(),
+        body: NestedScrollView(
+          headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
+            return <Widget>[
+              SliverAppBar(
+                floating: false,
+                pinned: true,
+                title: Text('Painel do Profissional'),
+              ),
+              SliverToBoxAdapter(child: _ProfessionalHeader()),
+              SliverPersistentHeader(
+                delegate: _SliverAppBarDelegate(
+                  TabBar(
+                    labelColor: Colors.blue,
+                    unselectedLabelColor: Colors.grey,
+                    tabs: [
+                      Tab(text: 'Disponíveis', icon: Icon(Icons.work_outline)),
+                      Tab(
+                        text: 'Meus Serviços',
+                        icon: Icon(Icons.assignment_ind),
+                      ),
+                      Tab(text: 'Histórico', icon: Icon(Icons.history)),
+                    ],
                   ),
-                ],
-              );
-            }),
-            IconButton(
-              icon: Icon(Icons.history),
-              onPressed: () => Get.toNamed(Routes.HISTORY),
-              tooltip: 'Histórico',
-            ),
-            IconButton(
-              icon: Icon(Icons.refresh),
-              onPressed: () => controller.fetchAvailableRequests(),
-            ),
-            IconButton(
-              icon: Icon(Icons.logout),
-              onPressed: () => Get.find<AuthController>().logout(),
-            ),
-          ],
-          bottom: TabBar(
-            tabs: [
-              Tab(text: 'Disponíveis', icon: Icon(Icons.work_outline)),
-              Tab(text: 'Meus Serviços', icon: Icon(Icons.assignment_ind)),
+                ),
+                pinned: true,
+              ),
+            ];
+          },
+          body: TabBarView(
+            children: [
+              _buildAvailableRequests(),
+              _buildMyRequests(),
+              HistoryView(),
             ],
           ),
-        ),
-        body: TabBarView(
-          children: [_buildAvailableRequests(), _buildMyRequests()],
-        ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () => controller.createDummyRequest(),
-          child: Icon(Icons.add),
-          tooltip: 'Criar Pedido de Teste',
         ),
       ),
     );
   }
 
-  void _showRequestDetails(ServiceRequestModel request) {
+  void _showRequestDetails(BuildContext context, ServiceRequestModel request) {
     Get.bottomSheet(
       Container(
         padding: EdgeInsets.all(24),
@@ -139,24 +128,48 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
               else if (request.status == 'accepted')
                 SizedBox(
                   width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Get.back();
-                      Get.toNamed(
-                        Routes.CHAT,
-                        arguments: {
-                          'requestId': request.id,
-                          'requestTitle': request.title,
-                        },
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    icon: Icon(Icons.chat),
-                    label: Text('Abrir Chat'),
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Get.back();
+                            Get.toNamed(
+                              Routes.CHAT,
+                              arguments: {
+                                'requestId': request.id,
+                                'requestTitle': request.title,
+                              },
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          icon: Icon(Icons.chat),
+                          label: Text('Abrir Chat'),
+                        ),
+                      ),
+                      SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Get.back();
+                            _showFinishRequestDialog(context, request);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blueAccent,
+                            foregroundColor: Colors.white,
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          icon: Icon(Icons.check_circle_outline),
+                          label: Text('Finalizar Serviço'),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
             ],
@@ -200,7 +213,7 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
         padding: EdgeInsets.all(16),
         itemBuilder: (context, index) {
           final request = controller.availableRequests[index];
-          return _buildServiceCard(request, isAvailable: true);
+          return _buildServiceCard(context, request, isAvailable: true);
         },
       );
     });
@@ -208,22 +221,27 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
 
   Widget _buildMyRequests() {
     return Obx(() {
-      if (controller.myRequests.isEmpty) {
-        return Center(child: Text('Você ainda não aceitou nenhum serviço.'));
+      final inProgressRequests = controller.myRequests
+          .where((r) => r.status == 'accepted')
+          .toList();
+
+      if (inProgressRequests.isEmpty) {
+        return Center(child: Text('Nenhum serviço em andamento.'));
       }
 
       return ListView.builder(
-        itemCount: controller.myRequests.length,
+        itemCount: inProgressRequests.length,
         padding: EdgeInsets.all(16),
         itemBuilder: (context, index) {
-          final request = controller.myRequests[index];
-          return _buildServiceCard(request, isAvailable: false);
+          final request = inProgressRequests[index];
+          return _buildServiceCard(context, request, isAvailable: false);
         },
       );
     });
   }
 
   Widget _buildServiceCard(
+    BuildContext context,
     ServiceRequestModel request, {
     required bool isAvailable,
   }) {
@@ -232,7 +250,7 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
       margin: EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
-        onTap: () => _showRequestDetails(request),
+        onTap: () => _showRequestDetails(context, request),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -427,5 +445,374 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
       default:
         return Colors.grey;
     }
+  }
+
+  void _showFinishRequestDialog(
+    BuildContext context,
+    ServiceRequestModel request,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Finalizar Serviço'),
+        content: Text('O serviço foi realizado com sucesso?'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _showFeedbackDialog(context, request, hasProblem: true);
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: Text('Teve Problema'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _showFeedbackDialog(context, request, hasProblem: false);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+            child: Text('Sim, Sucesso'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showFeedbackDialog(
+    BuildContext context,
+    ServiceRequestModel request, {
+    required bool hasProblem,
+  }) {
+    final _reviewController = TextEditingController();
+    final _problemController = TextEditingController();
+    double _rating = 5.0;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text(hasProblem ? 'Relatar Problema' : 'Avaliar Cliente'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (hasProblem) ...[
+                      Text(
+                        'Descreva o problema encontrado (Obrigatório):',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      SizedBox(height: 8),
+                      TextField(
+                        controller: _problemController,
+                        maxLines: 3,
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(),
+                          hintText:
+                              'Ex: Cliente não compareceu, local inseguro...',
+                        ),
+                      ),
+                      SizedBox(height: 16),
+                      Divider(),
+                      SizedBox(height: 16),
+                    ],
+                    Text(
+                      'Avalie o Cliente:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(5, (index) {
+                        return IconButton(
+                          icon: Icon(
+                            index < _rating ? Icons.star : Icons.star_border,
+                            color: Colors.amber,
+                            size: 32,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _rating = index + 1.0;
+                            });
+                          },
+                        );
+                      }),
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Opinião sobre o Cliente (Opcional):',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    SizedBox(height: 8),
+                    TextField(
+                      controller: _reviewController,
+                      maxLines: 2,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(),
+                        hintText:
+                            'Ex: Cliente atencioso, pagou corretamente...',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (hasProblem && _problemController.text.trim().isEmpty) {
+                      Get.snackbar(
+                        'Erro',
+                        'Por favor, descreva o problema.',
+                        backgroundColor: Colors.red.withOpacity(0.1),
+                        colorText: Colors.red,
+                      );
+                      return;
+                    }
+
+                    controller.finishRequest(
+                      requestId: request.id!,
+                      clientRating: _rating,
+                      clientReview: _reviewController.text,
+                      professionalHasProblem: hasProblem,
+                      professionalProblemDescription: hasProblem
+                          ? _problemController.text
+                          : null,
+                    );
+                  },
+                  child: Text('Confirmar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
+  final TabBar _tabBar;
+
+  _SliverAppBarDelegate(this._tabBar);
+
+  @override
+  double get minExtent => _tabBar.preferredSize.height;
+  @override
+  double get maxExtent => _tabBar.preferredSize.height;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return Container(color: Colors.white, child: _tabBar);
+  }
+
+  @override
+  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
+    return false;
+  }
+}
+
+class _ProfessionalHeader extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final authController = Get.find<AuthController>();
+    final professionalController = Get.find<ProfessionalController>();
+
+    return Obx(() {
+      final user = authController.currentUser.value;
+      if (user == null) return SizedBox();
+
+      return Container(
+        padding: EdgeInsets.all(16),
+        // Use primary color background or similar if not covered by AppBar background
+        // But since it's in FlexibleSpaceBar, it might need its own background color if the image isn't there
+        // Default AppBar color is blue usually.
+        color: Colors.blue,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Avatar and Info Row
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 30,
+                  backgroundImage: user.avatarUrl != null
+                      ? NetworkImage(user.avatarUrl!)
+                      : null,
+                  child: user.avatarUrl == null
+                      ? Text(
+                          user.name.isNotEmpty
+                              ? user.name[0].toUpperCase()
+                              : '?',
+                          style: TextStyle(fontSize: 24),
+                        )
+                      : null,
+                ),
+                SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user.name,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          Icon(Icons.star, color: Colors.amber, size: 16),
+                          Text(
+                            ' ${user.rating.toStringAsFixed(1)} (${user.ratingCount})',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.monetization_on,
+                        color: Colors.amber,
+                        size: 20,
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        '${user.coins}',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 12),
+            // Skills
+            if (user.skills != null && user.skills!.isNotEmpty)
+              SizedBox(
+                height: 40,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: user.skills!
+                      .map(
+                        (s) => Padding(
+                          padding: EdgeInsets.only(right: 8),
+                          child: Chip(
+                            label: Text(s, style: TextStyle(fontSize: 10)),
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
+          ],
+        ),
+      );
+    });
+  }
+}
+
+class _ProfessionalDrawer extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final authController = Get.find<AuthController>();
+    final professionalController = Get.find<ProfessionalController>();
+
+    return Drawer(
+      child: SafeArea(
+        child: Obx(() {
+          final user = authController.currentUser.value;
+          return ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              UserAccountsDrawerHeader(
+                accountName: Text(user?.name ?? 'Profissional'),
+                accountEmail: Text(user?.email ?? ''),
+                currentAccountPicture: CircleAvatar(
+                  backgroundImage: user?.avatarUrl != null
+                      ? NetworkImage(user!.avatarUrl!)
+                      : null,
+                  child: user?.avatarUrl == null
+                      ? Text(
+                          user?.name.isNotEmpty == true
+                              ? user!.name[0].toUpperCase()
+                              : '?',
+                          style: TextStyle(fontSize: 24),
+                        )
+                      : null,
+                ),
+                decoration: BoxDecoration(color: Colors.blue),
+              ),
+              ListTile(
+                leading: Icon(Icons.person),
+                title: Text('Perfil'),
+                onTap: () {
+                  Get.back();
+                  // Navegar para perfil
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.monetization_on),
+                title: Text('Moedas'),
+                trailing: Text('${user?.coins ?? 0}'),
+                onTap: () {
+                  Get.back();
+                  professionalController.addCoins(100);
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.notifications),
+                title: Text('Notificações'),
+                onTap: () {
+                  Get.back();
+                  // Navegar para notificações
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.refresh),
+                title: Text('Atualizar Pedidos'),
+                onTap: () {
+                  Get.back();
+                  professionalController.fetchAvailableRequests();
+                },
+              ),
+              Divider(),
+              ListTile(
+                leading: Icon(Icons.logout),
+                title: Text('Sair'),
+                onTap: () => authController.logout(),
+              ),
+            ],
+          );
+        }),
+      ),
+    );
   }
 }

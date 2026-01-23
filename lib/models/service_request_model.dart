@@ -16,6 +16,12 @@ class ServiceRequestModel {
   bool? hasProblem;
   String? problemDescription;
 
+  // Professional's rating of the client
+  double? clientRating;
+  String? clientReview;
+  bool? professionalHasProblem;
+  String? professionalProblemDescription;
+
   ServiceRequestModel({
     this.id,
     required this.clientId,
@@ -31,6 +37,10 @@ class ServiceRequestModel {
     this.review,
     this.hasProblem,
     this.problemDescription,
+    this.clientRating,
+    this.clientReview,
+    this.professionalHasProblem,
+    this.professionalProblemDescription,
   });
 
   factory ServiceRequestModel.fromDocument(DocumentSnapshot doc) {
@@ -54,6 +64,12 @@ class ServiceRequestModel {
       review: data['review'],
       hasProblem: data['hasProblem'],
       problemDescription: data['problemDescription'],
+      clientRating: (data['clientRating'] is int)
+          ? (data['clientRating'] as int).toDouble()
+          : (data['clientRating'] as double?),
+      clientReview: data['clientReview'],
+      professionalHasProblem: data['professionalHasProblem'],
+      professionalProblemDescription: data['professionalProblemDescription'],
     );
   }
 
@@ -72,6 +88,10 @@ class ServiceRequestModel {
       'review': review,
       'hasProblem': hasProblem,
       'problemDescription': problemDescription,
+      'clientRating': clientRating,
+      'clientReview': clientReview,
+      'professionalHasProblem': professionalHasProblem,
+      'professionalProblemDescription': professionalProblemDescription,
     };
   }
 }

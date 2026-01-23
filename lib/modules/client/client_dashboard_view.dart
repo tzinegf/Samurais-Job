@@ -3,220 +3,255 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../../models/service_request_model.dart';
 import '../../routes/app_routes.dart';
+import '../history/history_view.dart';
 import '../auth/auth_controller.dart';
 import 'client_controller.dart';
 
 class ClientDashboardView extends GetView<ClientController> {
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Painel do Cliente'),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.history),
-            onPressed: () => Get.toNamed(Routes.HISTORY),
-            tooltip: 'Histórico',
-          ),
-          IconButton(
-            icon: Icon(Icons.logout),
-            onPressed: () => Get.find<AuthController>().logout(),
-          ),
-        ],
-      ),
-      body: Obx(() {
-        if (controller.myRequests.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.list_alt, size: 64, color: Colors.grey),
-                SizedBox(height: 16),
-                Text('Você ainda não solicitou nenhum serviço.'),
-                SizedBox(height: 8),
-                ElevatedButton(
-                  onPressed: () => _showCreateRequestDialog(context),
-                  child: Text('Solicitar Novo Serviço'),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('Painel do Cliente'),
+          actions: [
+            // Rating Display
+            Obx(() {
+              final user = Get.find<AuthController>().currentUser.value;
+              final rating = user?.rating ?? 0.0;
+              final count = user?.ratingCount ?? 0;
+              return Padding(
+                padding: const EdgeInsets.only(right: 8.0),
+                child: Row(
+                  children: [
+                    Icon(Icons.star, color: Colors.amber),
+                    SizedBox(width: 4),
+                    Text(
+                      rating > 0 ? rating.toStringAsFixed(1) : '-',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    if (count > 0)
+                      Text(
+                        ' ($count)',
+                        style: TextStyle(fontSize: 12, color: Colors.white70),
+                      ),
+                  ],
                 ),
-              ],
+              );
+            }),
+            IconButton(
+              icon: Icon(Icons.logout),
+              onPressed: () => Get.find<AuthController>().logout(),
             ),
-          );
-        }
-
-        return ListView.builder(
-          padding: EdgeInsets.all(16),
-          itemCount: controller.myRequests.length,
-          itemBuilder: (context, index) {
-            final request = controller.myRequests[index];
-            return Card(
-              margin: EdgeInsets.only(bottom: 16),
-              elevation: 4,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: InkWell(
-                onTap: () => _showRequestDetails(context, request),
-                borderRadius: BorderRadius.circular(12),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue.shade50,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(
-                                  _getIconForCategory(request.category),
-                                  color: Colors.blue,
-                                  size: 20,
-                                ),
-                              ),
-                              SizedBox(width: 8),
-                              Text(
-                                request.category,
-                                style: TextStyle(
-                                  color: Colors.grey[700],
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _getStatusColor(
-                                request.status,
-                              ).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: _getStatusColor(
-                                  request.status,
-                                ).withOpacity(0.5),
-                              ),
-                            ),
-                            child: Text(
-                              _translateStatus(request.status),
-                              style: TextStyle(
-                                color: _getStatusColor(request.status),
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 12),
-                      Text(
-                        request.title,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        request.createdAt != null
-                            ? 'Criado em ${DateFormat('dd/MM/yyyy HH:mm').format(request.createdAt!)}'
-                            : 'Data desconhecida',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        request.description,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: Colors.grey[800], height: 1.3),
-                      ),
-                      SizedBox(height: 12),
-                      Divider(),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          if (request.price != null && request.price! > 0)
-                            Text(
-                              'R\$ ${request.price!.toStringAsFixed(2)}',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green[700],
-                              ),
-                            )
-                          else
-                            Text(
-                              'A combinar',
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontStyle: FontStyle.italic,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          if (request.status == 'pending')
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: Icon(Icons.edit, color: Colors.blue),
-                                  onPressed: () =>
-                                      _showEditRequestDialog(context, request),
-                                  tooltip: 'Editar',
-                                ),
-                                IconButton(
-                                  icon: Icon(Icons.delete, color: Colors.red),
-                                  onPressed: () =>
-                                      _confirmDeleteRequest(context, request),
-                                  tooltip: 'Excluir',
-                                ),
-                              ],
-                            )
-                          else if (request.status == 'accepted')
-                            ElevatedButton.icon(
-                              onPressed: () => Get.toNamed(
-                                Routes.CHAT,
-                                arguments: {
-                                  'requestId': request.id,
-                                  'requestTitle': request.title,
-                                },
-                              ),
-                              icon: Icon(Icons.chat, size: 16),
-                              label: Text('Chat'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
-                                foregroundColor: Colors.white,
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                textStyle: TextStyle(fontSize: 12),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      }),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showCreateRequestDialog(context),
-        icon: Icon(Icons.add),
-        label: Text('Novo Pedido'),
+          ],
+          bottom: TabBar(
+            tabs: [
+              Tab(text: 'Meus Pedidos', icon: Icon(Icons.list_alt)),
+              Tab(text: 'Histórico', icon: Icon(Icons.history)),
+            ],
+          ),
+        ),
+        body: TabBarView(
+          children: [_buildActiveRequests(context), HistoryView()],
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () => _showCreateRequestDialog(context),
+          icon: Icon(Icons.add),
+          label: Text('Novo Pedido'),
+        ),
       ),
     );
+  }
+
+  Widget _buildActiveRequests(BuildContext context) {
+    return Obx(() {
+      if (controller.myRequests.isEmpty) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.list_alt, size: 64, color: Colors.grey),
+              SizedBox(height: 16),
+              Text('Você ainda não solicitou nenhum serviço.'),
+              SizedBox(height: 8),
+              ElevatedButton(
+                onPressed: () => _showCreateRequestDialog(context),
+                child: Text('Solicitar Novo Serviço'),
+              ),
+            ],
+          ),
+        );
+      }
+
+      return ListView.builder(
+        padding: EdgeInsets.all(16),
+        itemCount: controller.myRequests.length,
+        itemBuilder: (context, index) {
+          final request = controller.myRequests[index];
+          return Card(
+            margin: EdgeInsets.only(bottom: 16),
+            elevation: 4,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: InkWell(
+              onTap: () => _showRequestDetails(context, request),
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                _getIconForCategory(request.category),
+                                color: Colors.blue,
+                                size: 20,
+                              ),
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              request.category,
+                              style: TextStyle(
+                                color: Colors.grey[700],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _getStatusColor(
+                              request.status,
+                            ).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _getStatusColor(
+                                request.status,
+                              ).withOpacity(0.5),
+                            ),
+                          ),
+                          child: Text(
+                            _translateStatus(request.status),
+                            style: TextStyle(
+                              color: _getStatusColor(request.status),
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 12),
+                    Text(
+                      request.title,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      request.createdAt != null
+                          ? 'Criado em ${DateFormat('dd/MM/yyyy HH:mm').format(request.createdAt!)}'
+                          : 'Data desconhecida',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      request.description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: Colors.grey[800], height: 1.3),
+                    ),
+                    SizedBox(height: 12),
+                    Divider(),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        if (request.price != null && request.price! > 0)
+                          Text(
+                            'R\$ ${request.price!.toStringAsFixed(2)}',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green[700],
+                            ),
+                          )
+                        else
+                          Text(
+                            'A combinar',
+                            style: TextStyle(
+                              color: Colors.grey,
+                              fontStyle: FontStyle.italic,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        if (request.status == 'pending')
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: Icon(Icons.edit, color: Colors.blue),
+                                onPressed: () =>
+                                    _showEditRequestDialog(context, request),
+                                tooltip: 'Editar',
+                              ),
+                              IconButton(
+                                icon: Icon(Icons.delete, color: Colors.red),
+                                onPressed: () =>
+                                    _confirmDeleteRequest(context, request),
+                                tooltip: 'Excluir',
+                              ),
+                            ],
+                          )
+                        else if (request.status == 'accepted')
+                          ElevatedButton.icon(
+                            onPressed: () => Get.toNamed(
+                              Routes.CHAT,
+                              arguments: {
+                                'requestId': request.id,
+                                'requestTitle': request.title,
+                              },
+                            ),
+                            icon: Icon(Icons.chat, size: 16),
+                            label: Text('Chat'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              foregroundColor: Colors.white,
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              textStyle: TextStyle(fontSize: 12),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    });
   }
 
   void _showRequestDetails(BuildContext context, ServiceRequestModel request) {

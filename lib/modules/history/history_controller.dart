@@ -23,8 +23,8 @@ class HistoryController extends GetxController {
       if (user == null) {
         // Tenta recuperar do firebaseUser se currentUser for nulo (edge case)
         if (_authController.firebaseUser.value != null) {
-           // Lógica de retry ou espera poderia ser adicionada, mas por enquanto retorna.
-           // Idealmente AuthController garante currentUser.
+          // Lógica de retry ou espera poderia ser adicionada, mas por enquanto retorna.
+          // Idealmente AuthController garante currentUser.
         }
         return;
       }
@@ -49,16 +49,15 @@ class HistoryController extends GetxController {
       final requests = snapshot.docs
           .map((doc) => ServiceRequestModel.fromDocument(doc))
           .toList();
-      
+
       // Sort locally by date desc
       requests.sort((a, b) {
-          final aDate = a.createdAt ?? DateTime(0);
-          final bDate = b.createdAt ?? DateTime(0);
-          return bDate.compareTo(aDate);
+        final aDate = a.createdAt ?? DateTime(0);
+        final bDate = b.createdAt ?? DateTime(0);
+        return bDate.compareTo(aDate);
       });
 
       historyRequests.assignAll(requests);
-
     } catch (e) {
       print("Error fetching history: $e");
       Get.snackbar("Erro", "Não foi possível carregar o histórico.");
@@ -66,7 +65,7 @@ class HistoryController extends GetxController {
       isLoading.value = false;
     }
   }
-  
+
   String translateStatus(String status) {
     switch (status) {
       case 'pending':

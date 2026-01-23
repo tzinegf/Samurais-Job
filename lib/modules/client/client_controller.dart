@@ -165,20 +165,46 @@ class ClientController extends GetxController {
   }) async {
     try {
       isLoading.value = true;
-      
-      Map<String, dynamic> data = {
-        'status': 'completed',
-        'completedAt': FieldValue.serverTimestamp(),
-        'rating': rating,
-        'review': review,
-        'hasProblem': hasProblem,
-        'problemDescription': problemDescription,
-      };
 
-      await _db.collection('service_requests').doc(requestId).update(data);
-      
-      // Update professional's coins/rating (logic to be added later if needed)
-      // For now just update the request.
+      final request = myRequests.firstWhere((r) => r.id == requestId);
+      final professionalId = request.professionalId;
+
+      await _db.runTransaction((transaction) async {
+        final requestRef = _db.collection('service_requests').doc(requestId);
+
+        // Update Service Request
+        transaction.update(requestRef, {
+          'status': 'completed',
+          'completedAt': FieldValue.serverTimestamp(),
+          'rating': rating,
+          'review': review,
+          'hasProblem': hasProblem,
+          'problemDescription': problemDescription,
+        });
+
+        // Update Professional's Rating
+        if (professionalId != null) {
+          final professionalRef = _db.collection('users').doc(professionalId);
+          final professionalDoc = await transaction.get(professionalRef);
+
+          if (professionalDoc.exists) {
+            final data = professionalDoc.data() as Map<String, dynamic>;
+            final currentRating = (data['rating'] is int)
+                ? (data['rating'] as int).toDouble()
+                : (data['rating'] ?? 0.0).toDouble();
+            final currentCount = data['ratingCount'] ?? 0;
+
+            final newCount = currentCount + 1;
+            final newRating =
+                ((currentRating * currentCount) + rating) / newCount;
+
+            transaction.update(professionalRef, {
+              'rating': newRating,
+              'ratingCount': newCount,
+            });
+          }
+        }
+      });
 
       Get.back(); // Close dialog
       Get.back(); // Close details bottom sheet

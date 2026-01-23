@@ -87,6 +87,23 @@ class ProfessionalController extends GetxController {
         return;
       }
 
+      // Check limit of 3 accepted services per category
+      final activeRequestsInSameCategory = myRequests
+          .where(
+            (r) => r.status == 'accepted' && r.category == request.category,
+          )
+          .length;
+
+      if (activeRequestsInSameCategory >= 3) {
+        Get.snackbar(
+          'Limite Atingido',
+          'Você já possui 3 serviços em andamento na categoria ${request.category}. Finalize um para aceitar novos.',
+          backgroundColor: Get.theme.colorScheme.errorContainer,
+          colorText: Get.theme.colorScheme.onErrorContainer,
+        );
+        return;
+      }
+
       if ((currentUser.coins ?? 0) < ACCEPT_COST) {
         Get.snackbar(
           'Saldo Insuficiente',
@@ -151,6 +168,68 @@ class ProfessionalController extends GetxController {
       Get.snackbar('Moedas Adicionadas', 'Você recebeu $amount moedas!');
     } catch (e) {
       Get.snackbar('Erro', 'Falha ao adicionar moedas: $e');
+    }
+  }
+
+  void finishRequest({
+    required String requestId,
+    required double clientRating,
+    required String clientReview,
+    required bool professionalHasProblem,
+    String? professionalProblemDescription,
+  }) async {
+    try {
+      isLoading.value = true;
+
+      final request = myRequests.firstWhere((r) => r.id == requestId);
+      final clientId = request.clientId;
+
+      await _db.runTransaction((transaction) async {
+        final requestRef = _db.collection('service_requests').doc(requestId);
+
+        // Update Service Request
+        transaction.update(requestRef, {
+          'status':
+              'completed', // Or keep 'completed' if already set? Let's ensure it's completed.
+          'completedAt': FieldValue.serverTimestamp(),
+          'clientRating': clientRating,
+          'clientReview': clientReview,
+          'professionalHasProblem': professionalHasProblem,
+          'professionalProblemDescription': professionalProblemDescription,
+        });
+
+        // Update Client's Rating
+        final clientRef = _db.collection('users').doc(clientId);
+        final clientDoc = await transaction.get(clientRef);
+
+        if (clientDoc.exists) {
+          final data = clientDoc.data() as Map<String, dynamic>;
+          final currentRating = (data['rating'] is int)
+              ? (data['rating'] as int).toDouble()
+              : (data['rating'] ?? 0.0).toDouble();
+          final currentCount = data['ratingCount'] ?? 0;
+
+          final newCount = currentCount + 1;
+          final newRating =
+              ((currentRating * currentCount) + clientRating) / newCount;
+
+          transaction.update(clientRef, {
+            'rating': newRating,
+            'ratingCount': newCount,
+          });
+        }
+      });
+
+      Get.back(); // Close dialog
+      Get.back(); // Close details bottom sheet
+      Get.snackbar(
+        "Sucesso",
+        "Serviço finalizado e cliente avaliado com sucesso!",
+      );
+    } catch (e) {
+      Get.snackbar("Erro ao finalizar serviço", e.toString());
+    } finally {
+      isLoading.value = false;
     }
   }
 

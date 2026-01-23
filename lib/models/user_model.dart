@@ -7,8 +7,11 @@ class UserModel {
   String role;
   String? phone;
   String? bio;
+  String? avatarUrl;
   List<String>? skills;
   int coins;
+  double rating;
+  int ratingCount;
 
   UserModel({
     this.id,
@@ -17,8 +20,11 @@ class UserModel {
     required this.role,
     this.phone,
     this.bio,
+    this.avatarUrl,
     this.skills,
     this.coins = 0,
+    this.rating = 0.0,
+    this.ratingCount = 0,
   });
 
   factory UserModel.fromDocument(DocumentSnapshot doc) {
@@ -30,8 +36,13 @@ class UserModel {
       role: data['role'] ?? 'client',
       phone: data['phone'],
       bio: data['bio'],
+      avatarUrl: data['avatarUrl'],
       skills: data['skills'] != null ? List<String>.from(data['skills']) : [],
       coins: data['coins'] ?? 0,
+      rating: (data['rating'] is int)
+          ? (data['rating'] as int).toDouble()
+          : (data['rating'] ?? 0.0).toDouble(),
+      ratingCount: data['ratingCount'] ?? 0,
     );
   }
 
@@ -42,8 +53,11 @@ class UserModel {
       'role': role,
       'phone': phone,
       'bio': bio,
+      'avatarUrl': avatarUrl,
       'skills': skills,
       'coins': coins,
+      'rating': rating,
+      'ratingCount': ratingCount,
     };
   }
 
