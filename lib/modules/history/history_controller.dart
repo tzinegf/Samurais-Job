@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/service_request_model.dart';
@@ -66,7 +67,12 @@ class HistoryController extends GetxController {
         },
         onError: (e) {
           print("Error fetching history: $e");
-          Get.snackbar("Erro", "Não foi possível carregar o histórico.", backgroundColor: Colors.red, colorText: Colors.white);
+          Get.snackbar(
+            "Erro",
+            "Não foi possível carregar o histórico.",
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+          );
           isLoading.value = false;
         },
       );
