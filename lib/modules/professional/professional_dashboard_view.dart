@@ -1,12 +1,32 @@
+import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:latlong2/latlong.dart';
 import '../../models/service_request_model.dart';
 import '../../routes/app_routes.dart';
+import '../../utils/ranking_system.dart';
 import '../history/history_view.dart';
 import 'professional_controller.dart';
 import '../auth/auth_controller.dart';
 import '../shared/mini_map_viewer.dart';
+
+ImageProvider? _getAvatarImage(String? avatarUrl) {
+  if (avatarUrl != null && avatarUrl.isNotEmpty) {
+    if (avatarUrl.startsWith('data:image')) {
+      try {
+        final base64String = avatarUrl.split(',').last;
+        return MemoryImage(base64Decode(base64String));
+      } catch (e) {
+        print('Erro ao decodificar imagem Base64: $e');
+        return null;
+      }
+    }
+    return NetworkImage(avatarUrl);
+  }
+  return null;
+}
 
 class ProfessionalDashboardView extends GetView<ProfessionalController> {
   @override
@@ -27,7 +47,8 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
               SliverPersistentHeader(
                 delegate: _SliverAppBarDelegate(
                   TabBar(
-                    labelColor: Colors.blue,
+                    labelColor: Color(0xFFDE3344),
+                    indicatorColor: Color(0xFFDE3344),
                     unselectedLabelColor: Colors.grey,
                     tabs: [
                       Tab(text: 'Disponíveis', icon: Icon(Icons.work_outline)),
@@ -122,22 +143,188 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
               ],
               SizedBox(height: 24),
               if (request.status == 'pending')
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Get.back();
-                      controller.acceptRequest(request);
+                if (request.quotedBy.contains(
+                  Get.find<AuthController>().currentUser.value?.id,
+                ))
+                  StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('service_requests')
+                        .doc(request.id)
+                        .collection('quotes')
+                        .where(
+                          'professionalId',
+                          isEqualTo:
+                              Get.find<AuthController>().currentUser.value?.id,
+                        )
+                        .limit(1)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                        return SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: null,
+                            style: ElevatedButton.styleFrom(
+                              disabledBackgroundColor: Colors.orange.shade100,
+                              disabledForegroundColor: Colors.orange.shade800,
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                            ),
+                            icon: Icon(Icons.hourglass_empty),
+                            label: Text('Aguardando retorno do cliente'),
+                          ),
+                        );
+                      }
+
+                      final quoteData =
+                          snapshot.data!.docs.first.data()
+                              as Map<String, dynamic>;
+                      final status = quoteData['status'];
+
+                      if (status == 'rejected') {
+                        final reason = quoteData['rejectionReason'] ?? '';
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Container(
+                              padding: EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.red.shade200),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.cancel,
+                                        color: Colors.red,
+                                        size: 20,
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'Proposta Recusada',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.red.shade900,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (reason.isNotEmpty) ...[
+                                    SizedBox(height: 8),
+                                    Text(
+                                      'Motivo: "$reason"',
+                                      style: TextStyle(
+                                        color: Colors.red.shade800,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+
+                      if (status == 'adjustment_requested') {
+                        final comment = quoteData['clientComment'] ?? '';
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Container(
+                              padding: EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Color(0xFFDE3344).withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Color(0xFFDE3344).withOpacity(0.3),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.info_outline,
+                                        color: Color(0xFFDE3344),
+                                        size: 20,
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'Cliente solicitou ajuste:',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFFDE3344),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (comment.isNotEmpty) ...[
+                                    SizedBox(height: 8),
+                                    Text(
+                                      '"$comment"',
+                                      style: TextStyle(
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            SizedBox(height: 12),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                Get.back();
+                                _showQuoteDialog(context, request);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Color(0xFFDE3344),
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                              ),
+                              icon: Icon(Icons.edit),
+                              label: Text('Enviar Novo Orçamento'),
+                            ),
+                          ],
+                        );
+                      }
+
+                      return SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: null,
+                          style: ElevatedButton.styleFrom(
+                            disabledBackgroundColor: Colors.orange.shade100,
+                            disabledForegroundColor: Colors.orange.shade800,
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          icon: Icon(Icons.hourglass_empty),
+                          label: Text('Aguardando retorno do cliente'),
+                        ),
+                      );
                     },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(vertical: 12),
+                  )
+                else
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Get.back();
+                        _showQuoteDialog(context, request);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Color(0xFFDE3344),
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      icon: Icon(Icons.lock_open),
+                      label: Text('Aceitar (20 Moedas)'),
                     ),
-                    icon: Icon(Icons.lock_open),
-                    label: Text('Aceitar (20 Moedas)'),
-                  ),
-                )
+                  )
               else if (request.status == 'accepted')
                 SizedBox(
                   width: double.infinity,
@@ -174,12 +361,28 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
                             _showFinishRequestDialog(context, request);
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blueAccent,
+                            backgroundColor: Colors.green,
                             foregroundColor: Colors.white,
                             padding: EdgeInsets.symmetric(vertical: 12),
                           ),
                           icon: Icon(Icons.check_circle_outline),
                           label: Text('Finalizar Serviço'),
+                        ),
+                      ),
+                      SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            _showCancelConfirmationDialog(context, request);
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red,
+                            side: BorderSide(color: Colors.red),
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          icon: Icon(Icons.cancel_outlined),
+                          label: Text('Cancelar Serviço'),
                         ),
                       ),
                     ],
@@ -193,43 +396,464 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
     );
   }
 
-  Widget _buildAvailableRequests() {
-    return Obx(() {
-      final user = Get.find<AuthController>().currentUser.value;
-      final skills = user?.skills?.join(', ') ?? 'Nenhuma';
+  void _showCancelConfirmationDialog(
+    BuildContext context,
+    ServiceRequestModel request,
+  ) {
+    Get.dialog(
+      AlertDialog(
+        title: Text('Cancelar Serviço?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Tem certeza que deseja cancelar este serviço?'),
+            SizedBox(height: 16),
+            Text(
+              'Atenção: Cancelamentos impactam negativamente seu Ranking Samurai e podem levar ao rebaixamento de nível.',
+              style: TextStyle(
+                color: Colors.red,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: Text('Não, manter')),
+          ElevatedButton(
+            onPressed: () {
+              Get.back(); // Close dialog
+              Get.back(); // Close details
+              controller.cancelService(request.id!);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: Text('Sim, Cancelar', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
 
-      if (controller.availableRequests.isEmpty) {
-        return Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+  void _showQuoteDialog(BuildContext context, ServiceRequestModel request) {
+    final priceController = TextEditingController(
+      text: request.price?.toStringAsFixed(2) ?? '',
+    );
+    final descriptionController = TextEditingController();
+    final isExclusive = false.obs;
+
+    Get.dialog(
+      Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Enviar Orçamento',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 16),
+                TextField(
+                  controller: priceController,
+                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    labelText: 'Valor (R\$)',
+                    border: OutlineInputBorder(),
+                    prefixText: 'R\$ ',
+                  ),
+                ),
+                SizedBox(height: 12),
+                TextField(
+                  controller: descriptionController,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    labelText: 'Descrição / Proposta',
+                    border: OutlineInputBorder(),
+                    hintText: 'Descreva o que está incluso no serviço...',
+                  ),
+                ),
+                SizedBox(height: 12),
+                Obx(
+                  () => SwitchListTile(
+                    title: Text(
+                      'Orçamento Exclusivo',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Text(
+                      'Pague o dobro (${ProfessionalController.EXCLUSIVE_QUOTE_COST} moedas) para ser o ÚNICO a enviar orçamentos a partir de agora.',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    value: isExclusive.value,
+                    onChanged: (val) => isExclusive.value = val,
+                    activeColor: Colors.amber,
+                  ),
+                ),
+                SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Get.back(),
+                      child: Text('Cancelar'),
+                    ),
+                    SizedBox(width: 12),
+                    Obx(
+                      () => ElevatedButton(
+                        onPressed: controller.isLoading.value
+                            ? null
+                            : () {
+                                final price = double.tryParse(
+                                  priceController.text.replaceAll(',', '.'),
+                                );
+                                final desc = descriptionController.text.trim();
+
+                                if (price == null || price <= 0) {
+                                  Get.snackbar(
+                                    'Erro',
+                                    'Informe um valor válido.',
+                                  );
+                                  return;
+                                }
+
+                                if (desc.isEmpty) {
+                                  Get.snackbar(
+                                    'Erro',
+                                    'Informe uma descrição.',
+                                  );
+                                  return;
+                                }
+
+                                controller.sendQuote(
+                                  request,
+                                  price,
+                                  desc,
+                                  isExclusive.value,
+                                );
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Color(0xFFDE3344),
+                          foregroundColor: Colors.white,
+                        ),
+                        child: controller.isLoading.value
+                            ? SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Text('Enviar'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAvailableRequests() {
+    return Column(
+      children: [
+        // Filter Chips
+        Container(
+          height: 60,
+          padding: EdgeInsets.symmetric(horizontal: 16),
+          child: ListView(
+            scrollDirection: Axis.horizontal,
             children: [
-              Text(
-                'Habilidades: $skills',
-                style: TextStyle(color: Colors.grey),
-              ), // Debug info
-              SizedBox(height: 16),
-              Icon(Icons.inbox, size: 64, color: Colors.grey),
-              SizedBox(height: 16),
-              Text('Nenhum pedido disponível no momento.'),
-              SizedBox(height: 8),
-              ElevatedButton(
-                onPressed: () => controller.createDummyRequest(),
-                child: Text('Criar Pedido de Teste'),
+              Obx(
+                () => FilterChip(
+                  label: Text('Mais Recentes'),
+                  selected: controller.currentFilter.value == 'recent',
+                  onSelected: (bool selected) {
+                    if (selected) controller.currentFilter.value = 'recent';
+                  },
+                  selectedColor: Color(0xFFDE3344).withOpacity(0.1),
+                  checkmarkColor: Color(0xFFDE3344),
+                ),
+              ),
+              SizedBox(width: 8),
+              Obx(
+                () => FilterChip(
+                  label: Text('Mais Próximos'),
+                  selected: controller.currentFilter.value == 'nearest',
+                  onSelected: (bool selected) {
+                    if (selected) {
+                      controller.currentFilter.value = 'nearest';
+                      if (controller.currentPosition.value == null) {
+                        controller.getCurrentLocation();
+                      }
+                    }
+                  },
+                  selectedColor: Color(0xFFDE3344).withOpacity(0.1),
+                  checkmarkColor: Color(0xFFDE3344),
+                ),
+              ),
+              SizedBox(width: 8),
+              Obx(
+                () => FilterChip(
+                  label: Text('Maior Valor'),
+                  selected: controller.currentFilter.value == 'price_desc',
+                  onSelected: (bool selected) {
+                    if (selected) controller.currentFilter.value = 'price_desc';
+                  },
+                  selectedColor: Color(0xFFDE3344).withOpacity(0.1),
+                  checkmarkColor: Color(0xFFDE3344),
+                ),
               ),
             ],
           ),
-        );
-      }
+        ),
+        Expanded(
+          child: Obx(() {
+            final user = Get.find<AuthController>().currentUser.value;
+            final skills = user?.skills?.join(', ') ?? 'Nenhuma';
 
-      return ListView.builder(
-        itemCount: controller.availableRequests.length,
-        padding: EdgeInsets.all(16),
-        itemBuilder: (context, index) {
-          final request = controller.availableRequests[index];
-          return _buildServiceCard(context, request, isAvailable: true);
-        },
-      );
-    });
+            if (controller.availableRequests.isEmpty) {
+              return Center(
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.work_off_outlined,
+                          size: 64,
+                          color: Colors.grey,
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'Nenhum pedido disponível para suas habilidades no momento.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'Suas habilidades: $skills',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            return ListView.builder(
+              padding: EdgeInsets.all(16),
+              itemCount: controller.availableRequests.length,
+              itemBuilder: (context, index) {
+                final request = controller.availableRequests[index];
+                return Card(
+                  margin: EdgeInsets.only(bottom: 16),
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: InkWell(
+                    onTap: () => _showRequestDetails(context, request),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Chip(
+                                    label: Text(
+                                      request.category,
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                                    backgroundColor: Color(0xFFDE3344),
+                                    padding: EdgeInsets.zero,
+                                    materialTapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  if (request.quotedBy.contains(
+                                    Get.find<AuthController>()
+                                        .currentUser
+                                        .value
+                                        ?.id,
+                                  )) ...[
+                                    SizedBox(width: 8),
+                                    StreamBuilder<QuerySnapshot>(
+                                      stream: FirebaseFirestore.instance
+                                          .collection('service_requests')
+                                          .doc(request.id)
+                                          .collection('quotes')
+                                          .where(
+                                            'professionalId',
+                                            isEqualTo:
+                                                Get.find<AuthController>()
+                                                    .currentUser
+                                                    .value
+                                                    ?.id,
+                                          )
+                                          .limit(1)
+                                          .snapshots(),
+                                      builder: (context, snapshot) {
+                                        String text = 'Proposta Enviada';
+                                        Color color = Colors.orange.shade100;
+                                        Color textColor =
+                                            Colors.orange.shade900;
+
+                                        if (snapshot.hasData &&
+                                            snapshot.data!.docs.isNotEmpty) {
+                                          final data =
+                                              snapshot.data!.docs.first.data()
+                                                  as Map<String, dynamic>;
+                                          if (data['status'] == 'rejected') {
+                                            text = 'Proposta Recusada';
+                                            color = Colors.red.shade100;
+                                            textColor = Colors.red.shade900;
+                                          } else if (data['status'] ==
+                                              'accepted') {
+                                            text = 'Proposta Aceita';
+                                            color = Colors.green.shade100;
+                                            textColor = Colors.green.shade900;
+                                          } else if (data['status'] ==
+                                              'adjustment_requested') {
+                                            text = 'Ajuste Solicitado';
+                                            color = Colors.orange.shade100;
+                                            textColor = Colors.orange.shade900;
+                                          }
+                                        }
+
+                                        return Container(
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: color,
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            text,
+                                            style: TextStyle(
+                                              color: textColor,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              if (request.price != null && request.price! > 0)
+                                Text(
+                                  'R\$ ${request.price!.toStringAsFixed(2)}',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green[700],
+                                  ),
+                                )
+                              else
+                                Text(
+                                  'A combinar',
+                                  style: TextStyle(
+                                    color: Colors.grey,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                            ],
+                          ),
+                          SizedBox(height: 12),
+                          Text(
+                            request.title,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            request.description,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: Colors.grey[800]),
+                          ),
+                          if (controller.currentFilter.value == 'nearest' &&
+                              controller.currentPosition.value != null &&
+                              request.latitude != null &&
+                              request.longitude != null) ...[
+                            SizedBox(height: 8),
+                            Builder(
+                              builder: (context) {
+                                final Distance distance = Distance();
+                                final km =
+                                    distance.as(
+                                      LengthUnit.Meter,
+                                      controller.currentPosition.value!,
+                                      LatLng(
+                                        request.latitude!,
+                                        request.longitude!,
+                                      ),
+                                    ) /
+                                    1000;
+                                return Text(
+                                  '${km.toStringAsFixed(1)} km de distância',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.blueGrey,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                          SizedBox(height: 12),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: Text(
+                              request.createdAt != null
+                                  ? DateFormat(
+                                      'dd/MM/yyyy HH:mm',
+                                    ).format(request.createdAt!)
+                                  : '',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            );
+          }),
+        ),
+      ],
+    );
   }
 
   Widget _buildMyRequests() {
@@ -278,12 +902,12 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
                       Container(
                         padding: EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
+                          color: Color(0xFFDE3344).withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(
                           _getIconForCategory(request.category),
-                          color: Colors.blue,
+                          color: Color(0xFFDE3344),
                           size: 20,
                         ),
                       ),
@@ -298,25 +922,39 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
                     ],
                   ),
                   if (!isAvailable)
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: _getStatusColor(request.status).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: _getStatusColor(
-                            request.status,
-                          ).withOpacity(0.5),
-                        ),
-                      ),
-                      child: Text(
-                        _translateStatus(request.status),
-                        style: TextStyle(
-                          color: _getStatusColor(request.status),
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                    Builder(
+                      builder: (context) {
+                        String statusText = _translateStatus(request.status);
+                        Color statusColor = _getStatusColor(request.status);
+
+                        if (request.status == 'completed' &&
+                            request.rating == null) {
+                          statusText = 'Aguardando Avaliação';
+                          statusColor = Colors.orange;
+                        }
+
+                        return Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: statusColor.withOpacity(0.5),
+                            ),
+                          ),
+                          child: Text(
+                            statusText,
+                            style: TextStyle(
+                              color: statusColor,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        );
+                      },
                     ),
                 ],
               ),
@@ -358,9 +996,9 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
                   ),
                   if (isAvailable)
                     ElevatedButton.icon(
-                      onPressed: () => controller.acceptRequest(request),
+                      onPressed: () => _showQuoteDialog(context, request),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
+                        backgroundColor: Color(0xFFDE3344),
                         foregroundColor: Colors.white,
                         padding: EdgeInsets.symmetric(
                           horizontal: 12,
@@ -368,8 +1006,8 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
                         ),
                         textStyle: TextStyle(fontSize: 12),
                       ),
-                      icon: Icon(Icons.lock_open, size: 16),
-                      label: Text('Aceitar'),
+                      icon: Icon(Icons.send, size: 16),
+                      label: Text('Orçar'),
                     )
                   else if (request.status == 'accepted')
                     ElevatedButton.icon(
@@ -450,7 +1088,7 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
       case 'pending':
         return Colors.orange;
       case 'accepted':
-        return Colors.blue;
+        return Color(0xFFDE3344);
       case 'completed':
         return Colors.green;
       case 'cancelled':
@@ -593,6 +1231,7 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
 
                     controller.finishRequest(
                       requestId: request.id!,
+                      clientId: request.clientId,
                       clientRating: _rating,
                       clientReview: _reviewController.text,
                       professionalHasProblem: hasProblem,
@@ -647,31 +1286,71 @@ class _ProfessionalHeader extends StatelessWidget {
       final user = authController.currentUser.value;
       if (user == null) return SizedBox();
 
+      // Calculate Rank
+      final rankLevel = RankingSystem.calculateRank(
+        user.completedServicesCount,
+        user.rating,
+        user.cancellationCount,
+      );
+      final rankName = RankingSystem.getRankName(rankLevel);
+      final rankTitle = RankingSystem.getRankTitle(rankLevel);
+      final rankColor = RankingSystem.getRankColor(rankLevel);
+      final rankIcon = RankingSystem.getRankIcon(rankLevel);
+      final rankImage = RankingSystem.getRankImage(rankLevel);
+      final rankQuote = RankingSystem.getRankQuote(rankLevel);
+
+      // Calculate Progress
+      final double progress = RankingSystem.getNextLevelProgress(
+        user.completedServicesCount,
+        user.rating,
+      );
+
+      final nextLevelReq = RankingSystem.getNextLevelRequirement(
+        user.completedServicesCount,
+        user.rating,
+        user.cancellationCount,
+      );
+      final String nextLevelText = progress < 1.0
+          ? 'Próximo Nível: ${nextLevelReq['next']}'
+          : 'Nível Máximo Alcançado';
+
       return Container(
         padding: EdgeInsets.all(16),
-        // Use primary color background or similar if not covered by AppBar background
-        // But since it's in FlexibleSpaceBar, it might need its own background color if the image isn't there
-        // Default AppBar color is blue usually.
-        color: Colors.blue,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFDE3344), Color(0xFFFF6B6B)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             // Avatar and Info Row
             Row(
               children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundImage: user.avatarUrl != null
-                      ? NetworkImage(user.avatarUrl!)
-                      : null,
-                  child: user.avatarUrl == null
-                      ? Text(
-                          user.name.isNotEmpty
-                              ? user.name[0].toUpperCase()
-                              : '?',
-                          style: TextStyle(fontSize: 24),
-                        )
-                      : null,
+                InkWell(
+                  onTap: () => Get.toNamed(Routes.PROFILE),
+                  borderRadius: BorderRadius.circular(30),
+                  child: Container(
+                    padding: EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: rankColor, width: 3),
+                    ),
+                    child: CircleAvatar(
+                      radius: 30,
+                      backgroundImage: _getAvatarImage(user.avatarUrl),
+                      child: user.avatarUrl == null
+                          ? Text(
+                              user.name.isNotEmpty
+                                  ? user.name[0].toUpperCase()
+                                  : '?',
+                              style: TextStyle(fontSize: 24),
+                            )
+                          : null,
+                    ),
+                  ),
                 ),
                 SizedBox(width: 16),
                 Expanded(
@@ -686,53 +1365,145 @@ class _ProfessionalHeader extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
+                      SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Image.asset(rankImage, width: 24, height: 24),
+                          SizedBox(width: 8),
+                          Expanded(
+                            // Added Expanded to prevent overflow
+                            child: Text(
+                              '$rankName — $rankTitle',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 4),
                       Row(
                         children: [
                           Icon(Icons.star, color: Colors.amber, size: 16),
                           Text(
                             ' ${user.rating.toStringAsFixed(1)} (${user.ratingCount})',
-                            style: TextStyle(color: Colors.white),
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                          Icon(Icons.work, color: Colors.white70, size: 14),
+                          Text(
+                            ' ${user.completedServicesCount} serviços',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
                           ),
                         ],
                       ),
                     ],
                   ),
                 ),
-                InkWell(
-                  onTap: () => Get.toNamed(Routes.BUY_COINS),
-                  borderRadius: BorderRadius.circular(20),
-                  child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    InkWell(
+                      onTap: () => Get.toNamed(Routes.BUY_COINS),
                       borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.monetization_on,
-                          color: Colors.amber,
-                          size: 20,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
                         ),
-                        SizedBox(width: 4),
-                        Text(
-                          '${user.coins}',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                      ],
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.monetization_on,
+                              color: Colors.amber,
+                              size: 20,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              '${user.coins}',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
+                    SizedBox(height: 12),
+                    Image.asset(rankImage, height: 80, fit: BoxFit.contain),
+                  ],
                 ),
               ],
             ),
+            SizedBox(height: 16),
+
+            // Ranking Quote & Progress
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withOpacity(0.2)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    rankQuote,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontStyle: FontStyle.italic,
+                      fontSize: 12,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        nextLevelText,
+                        style: TextStyle(color: Colors.white70, fontSize: 10),
+                      ),
+                      Text(
+                        '${(progress * 100).toInt()}%',
+                        style: TextStyle(color: Colors.white70, fontSize: 10),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 4),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      backgroundColor: Colors.white24,
+                      valueColor: AlwaysStoppedAnimation<Color>(rankColor),
+                      minHeight: 6,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
             SizedBox(height: 12),
             // Skills
             if (user.skills != null && user.skills!.isNotEmpty)
               SizedBox(
-                height: 40,
+                height: 32,
                 child: ListView(
                   scrollDirection: Axis.horizontal,
                   children: user.skills!
@@ -743,6 +1514,7 @@ class _ProfessionalHeader extends StatelessWidget {
                             label: Text(s, style: TextStyle(fontSize: 10)),
                             visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
+                            backgroundColor: Colors.white.withOpacity(0.9),
                           ),
                         ),
                       )
@@ -772,27 +1544,31 @@ class _ProfessionalDrawer extends StatelessWidget {
               UserAccountsDrawerHeader(
                 accountName: Text(user?.name ?? 'Profissional'),
                 accountEmail: Text(user?.email ?? ''),
-                currentAccountPicture: CircleAvatar(
-                  backgroundImage: user?.avatarUrl != null
-                      ? NetworkImage(user!.avatarUrl!)
-                      : null,
-                  child: user?.avatarUrl == null
-                      ? Text(
-                          user?.name.isNotEmpty == true
-                              ? user!.name[0].toUpperCase()
-                              : '?',
-                          style: TextStyle(fontSize: 24),
-                        )
-                      : null,
+                currentAccountPicture: GestureDetector(
+                  onTap: () {
+                    Get.back();
+                    Get.toNamed(Routes.PROFILE);
+                  },
+                  child: CircleAvatar(
+                    backgroundImage: _getAvatarImage(user?.avatarUrl),
+                    child: user?.avatarUrl == null
+                        ? Text(
+                            user?.name.isNotEmpty == true
+                                ? user!.name[0].toUpperCase()
+                                : '?',
+                            style: TextStyle(fontSize: 24),
+                          )
+                        : null,
+                  ),
                 ),
-                decoration: BoxDecoration(color: Colors.blue),
+                decoration: BoxDecoration(color: Color(0xFFDE3344)),
               ),
               ListTile(
                 leading: Icon(Icons.person),
-                title: Text('Perfil'),
+                title: Text('Meu Perfil'),
                 onTap: () {
                   Get.back();
-                  // Navegar para perfil
+                  Get.toNamed(Routes.PROFILE);
                 },
               ),
               ListTile(
@@ -818,6 +1594,14 @@ class _ProfessionalDrawer extends StatelessWidget {
                 onTap: () {
                   Get.back();
                   professionalController.fetchAvailableRequests();
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.settings),
+                title: Text('Configurações'),
+                onTap: () {
+                  Get.back();
+                  Get.toNamed(Routes.PROFESSIONAL_SETTINGS);
                 },
               ),
               Divider(),

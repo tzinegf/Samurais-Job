@@ -19,7 +19,20 @@ void main() async {
       getPages: AppPages.routes,
       initialBinding: AuthBinding(),
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.blue),
+      theme: ThemeData(
+        useMaterial3: true,
+        colorSchemeSeed: Color(0xFFDE3344),
+        appBarTheme: AppBarTheme(
+          backgroundColor: Color(0xFFDE3344),
+          foregroundColor: Colors.white,
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Color(0xFFDE3344),
+            foregroundColor: Colors.white,
+          ),
+        ),
+      ),
     ),
   );
 }

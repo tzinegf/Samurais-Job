@@ -7,11 +7,16 @@ class UserModel {
   String role;
   String? phone;
   String? bio;
+  String? address;
+  List<String>? documents;
   String? avatarUrl;
   List<String>? skills;
   int coins;
   double rating;
   int ratingCount;
+  int completedServicesCount;
+  int cancellationCount;
+  String ranking; // ronin, ashigaru, bushi, hatamoto, daimyo, shogun
 
   UserModel({
     this.id,
@@ -20,11 +25,16 @@ class UserModel {
     required this.role,
     this.phone,
     this.bio,
+    this.address,
+    this.documents,
     this.avatarUrl,
     this.skills,
     this.coins = 0,
     this.rating = 0.0,
     this.ratingCount = 0,
+    this.completedServicesCount = 0,
+    this.cancellationCount = 0,
+    this.ranking = 'ronin',
   });
 
   factory UserModel.fromDocument(DocumentSnapshot doc) {
@@ -36,6 +46,10 @@ class UserModel {
       role: data['role'] ?? 'client',
       phone: data['phone'],
       bio: data['bio'],
+      address: data['address'],
+      documents: data['documents'] != null
+          ? List<String>.from(data['documents'])
+          : [],
       avatarUrl: data['avatarUrl'],
       skills: data['skills'] != null ? List<String>.from(data['skills']) : [],
       coins: data['coins'] ?? 0,
@@ -43,6 +57,9 @@ class UserModel {
           ? (data['rating'] as int).toDouble()
           : (data['rating'] ?? 0.0).toDouble(),
       ratingCount: data['ratingCount'] ?? 0,
+      completedServicesCount: data['completedServicesCount'] ?? 0,
+      cancellationCount: data['cancellationCount'] ?? 0,
+      ranking: data['ranking'] ?? 'ronin',
     );
   }
 
@@ -53,11 +70,16 @@ class UserModel {
       'role': role,
       'phone': phone,
       'bio': bio,
+      'address': address,
+      'documents': documents,
       'avatarUrl': avatarUrl,
       'skills': skills,
       'coins': coins,
       'rating': rating,
       'ratingCount': ratingCount,
+      'completedServicesCount': completedServicesCount,
+      'cancellationCount': cancellationCount,
+      'ranking': ranking,
     };
   }
 

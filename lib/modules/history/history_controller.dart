@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/service_request_model.dart';
@@ -10,22 +11,29 @@ class HistoryController extends GetxController {
   RxList<ServiceRequestModel> historyRequests = <ServiceRequestModel>[].obs;
   RxBool isLoading = false.obs;
 
+  StreamSubscription? _historySubscription;
+
   @override
   void onInit() {
     super.onInit();
     fetchHistory();
   }
 
-  void fetchHistory() async {
+  @override
+  void onClose() {
+    _historySubscription?.cancel();
+    super.onClose();
+  }
+
+  void fetchHistory() {
     isLoading.value = true;
     try {
       final user = _authController.currentUser.value;
       if (user == null) {
-        // Tenta recuperar do firebaseUser se currentUser for nulo (edge case)
         if (_authController.firebaseUser.value != null) {
-          // Lógica de retry ou espera poderia ser adicionada, mas por enquanto retorna.
-          // Idealmente AuthController garante currentUser.
+          // Retry logic could be added here
         }
+        isLoading.value = false;
         return;
       }
 
@@ -35,33 +43,35 @@ class HistoryController extends GetxController {
         query = query.where('clientId', isEqualTo: user.id);
       } else if (user.role == 'professional') {
         query = query.where('professionalId', isEqualTo: user.id);
-      } else {
-        // Se for admin/moderador, talvez queira ver tudo?
-        // Por enquanto, vamos assumir que apenas cliente e profissional usam essa tela.
-        // Ou retornar vazio.
       }
 
       // Filter for completed or cancelled
       query = query.where('status', whereIn: ['completed', 'cancelled']);
 
-      final snapshot = await query.get();
+      _historySubscription = query.snapshots().listen(
+        (snapshot) {
+          final requests = snapshot.docs
+              .map((doc) => ServiceRequestModel.fromDocument(doc))
+              .toList();
 
-      final requests = snapshot.docs
-          .map((doc) => ServiceRequestModel.fromDocument(doc))
-          .toList();
+          // Sort locally by date desc
+          requests.sort((a, b) {
+            final aDate = a.createdAt ?? DateTime(0);
+            final bDate = b.createdAt ?? DateTime(0);
+            return bDate.compareTo(aDate);
+          });
 
-      // Sort locally by date desc
-      requests.sort((a, b) {
-        final aDate = a.createdAt ?? DateTime(0);
-        final bDate = b.createdAt ?? DateTime(0);
-        return bDate.compareTo(aDate);
-      });
-
-      historyRequests.assignAll(requests);
+          historyRequests.assignAll(requests);
+          isLoading.value = false;
+        },
+        onError: (e) {
+          print("Error fetching history: $e");
+          Get.snackbar("Erro", "Não foi possível carregar o histórico.", backgroundColor: Colors.red, colorText: Colors.white);
+          isLoading.value = false;
+        },
+      );
     } catch (e) {
-      print("Error fetching history: $e");
-      Get.snackbar("Erro", "Não foi possível carregar o histórico.");
-    } finally {
+      print("Error setting up history listener: $e");
       isLoading.value = false;
     }
   }

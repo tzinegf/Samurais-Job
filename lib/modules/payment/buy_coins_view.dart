@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'professional_controller.dart';
+import 'payment_controller.dart';
 
-class BuyCoinsView extends GetView<ProfessionalController> {
+class BuyCoinsView extends GetView<PaymentController> {
   final List<Map<String, dynamic>> packages = [
     {'coins': 10, 'price': 10.00, 'label': 'Pacote Básico'},
     {
@@ -75,7 +75,7 @@ class BuyCoinsView extends GetView<ProfessionalController> {
                         horizontal: 20,
                         vertical: 12,
                       ),
-                      backgroundColor: Colors.blue,
+                      backgroundColor: Color(0xFFDE3344),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -90,7 +90,7 @@ class BuyCoinsView extends GetView<ProfessionalController> {
                     child: Container(
                       padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.green,
+                        color: Color(0xFFDE3344),
                         borderRadius: BorderRadius.only(
                           topRight: Radius.circular(12),
                           bottomLeft: Radius.circular(12),
@@ -121,7 +121,7 @@ class BuyCoinsView extends GetView<ProfessionalController> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            Icon(Icons.shopping_cart, size: 48, color: Colors.blue),
+            Icon(Icons.shopping_cart, size: 48, color: Color(0xFFDE3344)),
             SizedBox(height: 16),
             Text(
               'Você está comprando ${pkg['coins']} moedas',
@@ -147,11 +147,11 @@ class BuyCoinsView extends GetView<ProfessionalController> {
       textConfirm: 'Pagar Agora',
       textCancel: 'Cancelar',
       confirmTextColor: Colors.white,
-      buttonColor: Colors.green,
+      buttonColor: Color(0xFFDE3344),
       cancelTextColor: Colors.red,
       onConfirm: () {
         Get.back(); // Close dialog
-        controller.simulatePurchase(pkg['coins'], pkg['price']);
+        controller.buyCoins(pkg['coins'], pkg['price']);
       },
     );
   }

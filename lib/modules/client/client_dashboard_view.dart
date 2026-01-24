@@ -1,75 +1,207 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 import '../../models/service_request_model.dart';
+import '../../models/quote_model.dart';
 import '../../routes/app_routes.dart';
+import '../../utils/ranking_system.dart';
 import '../history/history_view.dart';
 import '../auth/auth_controller.dart';
 import 'client_controller.dart';
 import '../shared/location_picker_view.dart';
 import '../shared/mini_map_viewer.dart';
 
+import '../../services/database_seeder.dart';
+
+ImageProvider? _getAvatarImage(String? avatarUrl) {
+  if (avatarUrl != null && avatarUrl.isNotEmpty) {
+    if (avatarUrl.startsWith('data:image')) {
+      try {
+        final base64String = avatarUrl.split(',').last;
+        return MemoryImage(base64Decode(base64String));
+      } catch (e) {
+        print('Erro ao decodificar imagem Base64: $e');
+        return null;
+      }
+    }
+    return NetworkImage(avatarUrl);
+  }
+  return null;
+}
+
 class ClientDashboardView extends GetView<ClientController> {
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text('Painel do Cliente'),
-          actions: [
-            // Rating Display
-            Obx(() {
-              final user = Get.find<AuthController>().currentUser.value;
-              final rating = user?.rating ?? 0.0;
-              final count = user?.ratingCount ?? 0;
-              return Padding(
-                padding: const EdgeInsets.only(right: 8.0),
-                child: Row(
-                  children: [
-                    Icon(Icons.star, color: Colors.amber),
-                    SizedBox(width: 4),
-                    Text(
-                      rating > 0 ? rating.toStringAsFixed(1) : '-',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+    return Scaffold(
+      drawer: _buildDrawer(context),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showCreateRequestDialog(context),
+        icon: Icon(Icons.add),
+        label: Text('Novo Pedido'),
+      ),
+      body: SafeArea(
+        child: DefaultTabController(
+          length: 2,
+          child: NestedScrollView(
+            headerSliverBuilder:
+                (BuildContext context, bool innerBoxIsScrolled) {
+                  return <Widget>[
+                    SliverAppBar(
+                      floating: false,
+                      pinned: true,
+                      title: Text('Painel do Cliente'),
                     ),
-                    if (count > 0)
-                      Text(
-                        ' ($count)',
-                        style: TextStyle(fontSize: 12, color: Colors.white70),
+                    SliverToBoxAdapter(child: _ClientHeader()),
+                    SliverPersistentHeader(
+                      delegate: _SliverAppBarDelegate(
+                        TabBar(
+                          labelColor: Color(0xFFDE3344),
+                          unselectedLabelColor: Colors.grey,
+                          indicatorColor: Color(0xFFDE3344),
+                          tabs: [
+                            Tab(
+                              text: 'Meus Pedidos',
+                              icon: Icon(Icons.list_alt),
+                            ),
+                            Tab(text: 'Histórico', icon: Icon(Icons.history)),
+                          ],
+                        ),
                       ),
-                  ],
-                ),
-              );
-            }),
-            IconButton(
-              icon: Icon(Icons.logout),
-              onPressed: () => Get.find<AuthController>().logout(),
+                      pinned: true,
+                    ),
+                  ];
+                },
+            body: TabBarView(
+              children: [_buildActiveRequests(context), HistoryView()],
             ),
-          ],
-          bottom: TabBar(
-            tabs: [
-              Tab(text: 'Meus Pedidos', icon: Icon(Icons.list_alt)),
-              Tab(text: 'Histórico', icon: Icon(Icons.history)),
-            ],
           ),
-        ),
-        body: TabBarView(
-          children: [_buildActiveRequests(context), HistoryView()],
-        ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () => _showCreateRequestDialog(context),
-          icon: Icon(Icons.add),
-          label: Text('Novo Pedido'),
         ),
       ),
     );
   }
 
+  Widget _buildDrawer(BuildContext context) {
+    final authController = Get.find<AuthController>();
+    return Drawer(
+      child: Obx(() {
+        final user = authController.currentUser.value;
+        return ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            UserAccountsDrawerHeader(
+              accountName: Text(user?.name ?? 'Usuário'),
+              accountEmail: Text(user?.email ?? 'email@exemplo.com'),
+              currentAccountPicture: GestureDetector(
+                onTap: () {
+                  Get.back();
+                  Get.toNamed(Routes.PROFILE);
+                },
+                child: CircleAvatar(
+                  backgroundColor: Colors.white,
+                  backgroundImage: _getAvatarImage(user?.avatarUrl),
+                  child: user?.avatarUrl == null
+                      ? Text(
+                          (user?.name ?? 'U').substring(0, 1).toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 40.0,
+                            color: Color(0xFFDE3344),
+                          ),
+                        )
+                      : null,
+                ),
+              ),
+              decoration: BoxDecoration(color: Color(0xFFDE3344)),
+            ),
+            ListTile(
+              leading: Icon(Icons.home),
+              title: Text('Início'),
+              onTap: () {
+                Get.back(); // Close drawer
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.person),
+              title: Text('Meu Perfil'),
+              onTap: () {
+                Get.back();
+                Get.toNamed(Routes.PROFILE);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.settings),
+              title: Text('Configurações'),
+              onTap: () {
+                Get.back();
+                // TODO: Navigate to settings
+                Get.snackbar(
+                  'Em breve',
+                  'Funcionalidade de configurações em desenvolvimento',
+                );
+              },
+            ),
+            // Admin Seed Menu in Drawer
+            if (user?.role == 'admin' ||
+                user?.email == 'eg_f1@hotmail.com') ...[
+              Divider(),
+              ListTile(
+                leading: Icon(Icons.cloud_upload),
+                title: Text('Atualizar BD (Seed)'),
+                onTap: () {
+                  Get.back();
+                  _runSeeder();
+                },
+              ),
+            ],
+            Divider(),
+            ListTile(
+              leading: Icon(Icons.exit_to_app, color: Colors.red),
+              title: Text('Sair', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                authController.logout();
+              },
+            ),
+          ],
+        );
+      }),
+    );
+  }
+
+  void _runSeeder() {
+    Get.dialog(
+      Center(child: CircularProgressIndicator()),
+      barrierDismissible: false,
+    );
+    DatabaseSeeder()
+        .seed()
+        .then((_) {
+          Get.back(); // Close loading
+          Get.snackbar(
+            'Sucesso',
+            'Categorias e serviços atualizados com sucesso!',
+            backgroundColor: Colors.green,
+            colorText: Colors.white,
+          );
+        })
+        .catchError((e) {
+          Get.back(); // Close loading
+          Get.snackbar(
+            'Erro',
+            'Erro ao atualizar: $e',
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+          );
+        });
+  }
+
   Widget _buildActiveRequests(BuildContext context) {
     return Obx(() {
-      if (controller.myRequests.isEmpty) {
+      final activeRequests = controller.myRequests
+          .where((r) => r.status != 'completed' && r.status != 'cancelled')
+          .toList();
+
+      if (activeRequests.isEmpty) {
         return Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -89,9 +221,9 @@ class ClientDashboardView extends GetView<ClientController> {
 
       return ListView.builder(
         padding: EdgeInsets.all(16),
-        itemCount: controller.myRequests.length,
+        itemCount: activeRequests.length,
         itemBuilder: (context, index) {
-          final request = controller.myRequests[index];
+          final request = activeRequests[index];
           return Card(
             margin: EdgeInsets.only(bottom: 16),
             elevation: 4,
@@ -114,12 +246,12 @@ class ClientDashboardView extends GetView<ClientController> {
                             Container(
                               padding: EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: Colors.blue.shade50,
+                                color: Color(0xFFDE3344).withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Icon(
                                 _getIconForCategory(request.category),
-                                color: Colors.blue,
+                                color: Color(0xFFDE3344),
                                 size: 20,
                               ),
                             ),
@@ -133,30 +265,69 @@ class ClientDashboardView extends GetView<ClientController> {
                             ),
                           ],
                         ),
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _getStatusColor(
-                              request.status,
-                            ).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: _getStatusColor(
-                                request.status,
-                              ).withOpacity(0.5),
+                        Row(
+                          children: [
+                            if (request.quoteCount > 0 &&
+                                request.status == 'pending') ...[
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.purple.shade100,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.purple.shade200,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.mail_outline,
+                                      size: 14,
+                                      color: Colors.purple.shade800,
+                                    ),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      '${request.quoteCount} Orçamento${request.quoteCount > 1 ? 's' : ''}',
+                                      style: TextStyle(
+                                        color: Colors.purple.shade800,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                            ],
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _getStatusColor(
+                                  request.status,
+                                ).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: _getStatusColor(
+                                    request.status,
+                                  ).withOpacity(0.5),
+                                ),
+                              ),
+                              child: Text(
+                                _translateStatus(request.status),
+                                style: TextStyle(
+                                  color: _getStatusColor(request.status),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
-                          ),
-                          child: Text(
-                            _translateStatus(request.status),
-                            style: TextStyle(
-                              color: _getStatusColor(request.status),
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                          ],
                         ),
                       ],
                     ),
@@ -211,7 +382,10 @@ class ClientDashboardView extends GetView<ClientController> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
-                                icon: Icon(Icons.edit, color: Colors.blue),
+                                icon: Icon(
+                                  Icons.edit,
+                                  color: Color(0xFFDE3344),
+                                ),
                                 onPressed: () =>
                                     _showEditRequestDialog(context, request),
                                 tooltip: 'Editar',
@@ -244,6 +418,24 @@ class ClientDashboardView extends GetView<ClientController> {
                               ),
                               textStyle: TextStyle(fontSize: 12),
                             ),
+                          )
+                        else if (request.status == 'completed' &&
+                            request.rating == null)
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              _showFinishRequestDialog(context, request);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.amber,
+                              foregroundColor: Colors.white,
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              textStyle: TextStyle(fontSize: 12),
+                            ),
+                            icon: Icon(Icons.star, size: 16),
+                            label: Text('Avaliar'),
                           ),
                       ],
                     ),
@@ -346,6 +538,339 @@ class ClientDashboardView extends GetView<ClientController> {
                 ),
               ],
 
+              if (request.status == 'pending') ...[
+                SizedBox(height: 24),
+                Divider(),
+                SizedBox(height: 16),
+                Text(
+                  'Orçamentos Recebidos:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+                SizedBox(height: 16),
+                StreamBuilder<List<QuoteModel>>(
+                  stream: controller.getQuotes(request.id!),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return Center(child: CircularProgressIndicator());
+                    }
+                    if (snapshot.hasError) {
+                      return Text('Erro ao carregar orçamentos.');
+                    }
+                    final quotes = snapshot.data ?? [];
+                    if (quotes.isEmpty) {
+                      return Text(
+                        'Nenhum orçamento recebido ainda.',
+                        style: TextStyle(color: Colors.grey),
+                      );
+                    }
+
+                    return ListView.builder(
+                      shrinkWrap: true,
+                      physics: NeverScrollableScrollPhysics(),
+                      itemCount: quotes.length,
+                      itemBuilder: (context, index) {
+                        final quote = quotes[index];
+                        final rankLevel = RankingSystem.getLevelFromString(
+                          quote.professionalRank ?? 'ronin',
+                        );
+                        final rankName = RankingSystem.getRankName(rankLevel);
+                        final rankColor = RankingSystem.getRankColor(rankLevel);
+                        final rankIcon = RankingSystem.getRankIcon(rankLevel);
+                        final rankImage = RankingSystem.getRankImage(rankLevel);
+
+                        return Card(
+                          margin: EdgeInsets.only(bottom: 12),
+                          elevation: 2,
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          quote.professionalName,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                        SizedBox(height: 2),
+                                        Row(
+                                          children: [
+                                            Image.asset(
+                                              rankImage,
+                                              width: 20,
+                                              height: 20,
+                                            ),
+                                            SizedBox(width: 4),
+                                            Text(
+                                              rankName,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: rankColor,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            if (rankLevel.index >=
+                                                RankingLevel
+                                                    .ashigaru
+                                                    .index) ...[
+                                              SizedBox(width: 4),
+                                              Icon(
+                                                Icons.verified,
+                                                size: 14,
+                                                color: rankColor,
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                    Text(
+                                      'R\$ ${quote.price.toStringAsFixed(2)}',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.green,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 8),
+                                if (quote.professionalRating != null ||
+                                    quote.professionalCompletedServices != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 8.0),
+                                    child: Row(
+                                      children: [
+                                        if (quote.professionalRating !=
+                                            null) ...[
+                                          Icon(
+                                            Icons.star,
+                                            size: 14,
+                                            color: Colors.amber,
+                                          ),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            quote.professionalRating!
+                                                .toStringAsFixed(1),
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                          SizedBox(width: 8),
+                                        ],
+                                        if (quote
+                                                .professionalCompletedServices !=
+                                            null) ...[
+                                          Icon(
+                                            Icons.work_outline,
+                                            size: 14,
+                                            color: Colors.grey[600],
+                                          ),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            '${quote.professionalCompletedServices} serviços',
+                                            style: TextStyle(
+                                              color: Colors.grey[800],
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                Text(quote.description),
+                                SizedBox(height: 12),
+                                if (quote.isExclusive)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 8.0),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.star,
+                                          color: Colors.amber,
+                                          size: 16,
+                                        ),
+                                        SizedBox(width: 4),
+                                        Text(
+                                          'Orçamento Exclusivo',
+                                          style: TextStyle(
+                                            color: Colors.amber[800],
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                if (quote.status == 'rejected')
+                                  Container(
+                                    width: double.infinity,
+                                    padding: EdgeInsets.symmetric(vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.shade50,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: Colors.red.shade200,
+                                      ),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        'Orçamento Recusado',
+                                        style: TextStyle(
+                                          color: Colors.red.shade700,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                else if (quote.status == 'accepted')
+                                  Container(
+                                    width: double.infinity,
+                                    padding: EdgeInsets.symmetric(vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green.shade50,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: Colors.green.shade200,
+                                      ),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        'Orçamento Aceito',
+                                        style: TextStyle(
+                                          color: Colors.green.shade700,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                else if (quote.status == 'adjustment_requested')
+                                  Container(
+                                    width: double.infinity,
+                                    padding: EdgeInsets.symmetric(vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange.shade50,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: Colors.orange.shade200,
+                                      ),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        'Ajuste Solicitado',
+                                        style: TextStyle(
+                                          color: Colors.orange.shade800,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  Column(
+                                    children: [
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: TextButton.icon(
+                                          onPressed: () =>
+                                              _showRequestAdjustmentDialog(
+                                                context,
+                                                request,
+                                                quote,
+                                              ),
+                                          icon: Icon(
+                                            Icons.edit_note,
+                                            color: Colors.orange,
+                                          ),
+                                          label: Text(
+                                            'Solicitar Ajuste',
+                                            style: TextStyle(
+                                              color: Colors.orange,
+                                            ),
+                                          ),
+                                          style: TextButton.styleFrom(
+                                            padding: EdgeInsets.symmetric(
+                                              vertical: 12,
+                                            ),
+                                            side: BorderSide(
+                                              color: Colors.orange,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(height: 12),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: OutlinedButton(
+                                              onPressed: () =>
+                                                  _showRejectQuoteDialog(
+                                                    context,
+                                                    request,
+                                                    quote,
+                                                  ),
+                                              style: OutlinedButton.styleFrom(
+                                                foregroundColor: Colors.red,
+                                                side: BorderSide(
+                                                  color: Colors.red,
+                                                ),
+                                                padding: EdgeInsets.symmetric(
+                                                  vertical: 12,
+                                                ),
+                                              ),
+                                              child: Text('Recusar'),
+                                            ),
+                                          ),
+                                          SizedBox(width: 12),
+                                          Expanded(
+                                            child: ElevatedButton(
+                                              onPressed: () {
+                                                _showAcceptQuoteDialog(
+                                                  context,
+                                                  request,
+                                                  quote,
+                                                );
+                                              },
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: Color(
+                                                  0xFFDE3344,
+                                                ),
+                                                foregroundColor: Colors.white,
+                                                padding: EdgeInsets.symmetric(
+                                                  vertical: 12,
+                                                ),
+                                              ),
+                                              child: Text('Aceitar'),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ],
+
               if (request.status == 'accepted' &&
                   request.professionalId != null) ...[
                 SizedBox(height: 24),
@@ -378,13 +903,25 @@ class ClientDashboardView extends GetView<ClientController> {
                         ? (proData['skills'] as List).join(', ')
                         : 'Nenhuma habilidade listada';
 
+                    final double rating = (proData['rating'] is int)
+                        ? (proData['rating'] as int).toDouble()
+                        : (proData['rating'] as double?) ?? 0.0;
+                    final int ratingCount = proData['ratingCount'] ?? 0;
+
+                    final rankLevel = RankingSystem.getLevelFromString(
+                      proData['ranking'] ?? 'ronin',
+                    );
+                    final rankName = RankingSystem.getRankName(rankLevel);
+                    final rankColor = RankingSystem.getRankColor(rankLevel);
+                    final rankImage = RankingSystem.getRankImage(rankLevel);
+
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         ListTile(
                           contentPadding: EdgeInsets.zero,
                           leading: CircleAvatar(
-                            backgroundColor: Colors.blue,
+                            backgroundColor: Color(0xFFDE3344),
                             child: Text(
                               (proData['name'] as String?)
                                       ?.substring(0, 1)
@@ -400,7 +937,55 @@ class ClientDashboardView extends GetView<ClientController> {
                               fontSize: 16,
                             ),
                           ),
-                          subtitle: Text(proData['email'] ?? ''),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(proData['email'] ?? ''),
+                              SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Image.asset(rankImage, width: 20, height: 20),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    rankName,
+                                    style: TextStyle(
+                                      color: rankColor,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.star,
+                                    color: Colors.amber,
+                                    size: 18,
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    rating > 0
+                                        ? rating.toStringAsFixed(1)
+                                        : 'Novo',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                  if (ratingCount > 0)
+                                    Text(
+                                      ' ($ratingCount avaliações)',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
                         SizedBox(height: 8),
                         Text(
@@ -432,7 +1017,7 @@ class ClientDashboardView extends GetView<ClientController> {
                               );
                             },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blue,
+                              backgroundColor: Color(0xFFDE3344),
                               foregroundColor: Colors.white,
                               padding: EdgeInsets.symmetric(vertical: 12),
                             ),
@@ -580,7 +1165,7 @@ class ClientDashboardView extends GetView<ClientController> {
                             onPressed: () => controller.getCurrentLocation(),
                             icon: Icon(Icons.my_location),
                             tooltip: 'Usar localização atual',
-                            color: Colors.blue,
+                            color: Color(0xFFDE3344),
                           ),
                         ],
                       ),
@@ -783,7 +1368,7 @@ class ClientDashboardView extends GetView<ClientController> {
       case 'pending':
         return Colors.orange;
       case 'accepted':
-        return Colors.blue;
+        return Color(0xFFDE3344);
       case 'completed':
         return Colors.green;
       case 'cancelled':
@@ -939,5 +1524,418 @@ class ClientDashboardView extends GetView<ClientController> {
         ),
       ),
     );
+  }
+
+  void _showRequestAdjustmentDialog(
+    BuildContext context,
+    ServiceRequestModel request,
+    QuoteModel quote,
+  ) {
+    final reasonController = TextEditingController();
+    Get.dialog(
+      Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Solicitar Ajuste',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Descreva o que você gostaria de ajustar no orçamento (ex: valor, prazo, materiais).',
+                style: TextStyle(color: Colors.grey[700]),
+              ),
+              SizedBox(height: 16),
+              TextField(
+                controller: reasonController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  labelText: 'Mensagem para o profissional',
+                  border: OutlineInputBorder(),
+                  hintText: 'Olá, poderia fazer por R\$...',
+                ),
+              ),
+              SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Get.back(),
+                    child: Text('Cancelar'),
+                  ),
+                  SizedBox(width: 12),
+                  Obx(
+                    () => ElevatedButton(
+                      onPressed: controller.isLoading.value
+                          ? null
+                          : () {
+                              if (reasonController.text.trim().isEmpty) {
+                                Get.snackbar(
+                                  'Atenção',
+                                  'Por favor, digite uma mensagem.',
+                                );
+                                return;
+                              }
+                              controller.requestQuoteAdjustment(
+                                request,
+                                quote,
+                                reasonController.text,
+                              );
+                            },
+                      child: controller.isLoading.value
+                          ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text('Enviar Solicitação'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showRejectQuoteDialog(
+    BuildContext context,
+    ServiceRequestModel request,
+    QuoteModel quote,
+  ) {
+    String? selectedReason;
+    final otherReasonController = TextEditingController();
+    final reasons = [
+      'Preço alto',
+      'Prazo longo',
+      'Escopo não atende',
+      'Contratei outro profissional',
+      'Outro',
+    ];
+
+    Get.dialog(
+      Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: StatefulBuilder(
+            builder: (context, setState) {
+              return SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Recusar Orçamento',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Por favor, selecione o motivo da recusa:',
+                      style: TextStyle(color: Colors.grey[700]),
+                    ),
+                    SizedBox(height: 16),
+                    ...reasons.map(
+                      (reason) => RadioListTile<String>(
+                        title: Text(reason),
+                        value: reason,
+                        groupValue: selectedReason,
+                        onChanged: (value) {
+                          setState(() {
+                            selectedReason = value;
+                          });
+                        },
+                      ),
+                    ),
+                    if (selectedReason == 'Outro') ...[
+                      SizedBox(height: 8),
+                      TextField(
+                        controller: otherReasonController,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          labelText: 'Descreva o motivo',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ],
+                    SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Get.back(),
+                          child: Text('Cancelar'),
+                        ),
+                        SizedBox(width: 12),
+                        Obx(
+                          () => ElevatedButton(
+                            onPressed: controller.isLoading.value
+                                ? null
+                                : () {
+                                    if (selectedReason == null) {
+                                      Get.snackbar(
+                                        'Atenção',
+                                        'Selecione um motivo.',
+                                      );
+                                      return;
+                                    }
+                                    String finalReason = selectedReason!;
+                                    if (selectedReason == 'Outro') {
+                                      if (otherReasonController.text
+                                          .trim()
+                                          .isEmpty) {
+                                        Get.snackbar(
+                                          'Atenção',
+                                          'Descreva o motivo.',
+                                        );
+                                        return;
+                                      }
+                                      finalReason = otherReasonController.text
+                                          .trim();
+                                    }
+
+                                    controller.rejectQuote(
+                                      request,
+                                      quote,
+                                      finalReason,
+                                    );
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                            ),
+                            child: controller.isLoading.value
+                                ? SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : Text('Confirmar Recusa'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showAcceptQuoteDialog(
+    BuildContext context,
+    ServiceRequestModel request,
+    QuoteModel quote,
+  ) {
+    Get.dialog(
+      AlertDialog(
+        title: Text('Aceitar Orçamento'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Você deseja aceitar este orçamento?'),
+            SizedBox(height: 16),
+            Text(
+              'Profissional: ${quote.professionalName}',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            Text(
+              'Valor: R\$ ${quote.price.toStringAsFixed(2)}',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.green,
+              ),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Ao aceitar, o status do pedido mudará para "Aceito" e você poderá conversar com o profissional.',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: Text('Cancelar')),
+          Obx(
+            () => ElevatedButton(
+              onPressed: controller.isLoading.value
+                  ? null
+                  : () {
+                      controller.acceptQuote(request, quote);
+                    },
+              child: controller.isLoading.value
+                  ? SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Text('Confirmar'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
+  final TabBar _tabBar;
+
+  _SliverAppBarDelegate(this._tabBar);
+
+  @override
+  double get minExtent => _tabBar.preferredSize.height;
+  @override
+  double get maxExtent => _tabBar.preferredSize.height;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return Container(color: Colors.white, child: _tabBar);
+  }
+
+  @override
+  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
+    return false;
+  }
+}
+
+class _ClientHeader extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final authController = Get.find<AuthController>();
+
+    return Obx(() {
+      final user = authController.currentUser.value;
+      if (user == null) return SizedBox();
+
+      return Container(
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFDE3344), Color(0xFFFF6B6B)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                InkWell(
+                  onTap: () => Get.toNamed(Routes.PROFILE),
+                  borderRadius: BorderRadius.circular(30),
+                  child: Container(
+                    padding: EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    child: CircleAvatar(
+                      radius: 30,
+                      backgroundImage: _getAvatarImage(user.avatarUrl),
+                      child: user.avatarUrl == null
+                          ? Text(
+                              user.name.isNotEmpty
+                                  ? user.name[0].toUpperCase()
+                                  : '?',
+                              style: TextStyle(fontSize: 24),
+                            )
+                          : null,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user.name,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(Icons.star, color: Colors.amber, size: 16),
+                          Text(
+                            ' ${user.rating.toStringAsFixed(1)} (${user.ratingCount})',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                InkWell(
+                  onTap: () => Get.toNamed(Routes.BUY_COINS),
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.monetization_on,
+                          color: Colors.amber,
+                          size: 20,
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          '${user.coins ?? 0}',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    });
   }
 }

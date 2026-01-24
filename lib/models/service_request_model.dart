@@ -22,6 +22,12 @@ class ServiceRequestModel {
   bool? professionalHasProblem;
   String? professionalProblemDescription;
 
+  // Exclusivity and Quotes logic
+  int quoteCount;
+  bool isExclusive;
+  String? exclusiveProfessionalId;
+  List<String> quotedBy;
+
   // Location
   double? latitude;
   double? longitude;
@@ -45,6 +51,10 @@ class ServiceRequestModel {
     this.clientReview,
     this.professionalHasProblem,
     this.professionalProblemDescription,
+    this.quoteCount = 0,
+    this.isExclusive = false,
+    this.exclusiveProfessionalId,
+    this.quotedBy = const [],
     this.latitude,
     this.longitude,
   });
@@ -76,6 +86,10 @@ class ServiceRequestModel {
       clientReview: data['clientReview'],
       professionalHasProblem: data['professionalHasProblem'],
       professionalProblemDescription: data['professionalProblemDescription'],
+      quoteCount: data['quoteCount'] ?? 0,
+      isExclusive: data['isExclusive'] ?? false,
+      exclusiveProfessionalId: data['exclusiveProfessionalId'],
+      quotedBy: List<String>.from(data['quotedBy'] ?? []),
       latitude: (data['latitude'] is int)
           ? (data['latitude'] as int).toDouble()
           : (data['latitude'] as double?),
@@ -98,6 +112,11 @@ class ServiceRequestModel {
       'completedAt': completedAt,
       'rating': rating,
       'review': review,
+      'quoteCount': quoteCount,
+      'isExclusive': isExclusive,
+      'exclusiveProfessionalId': exclusiveProfessionalId,
+      'quotedBy': quotedBy,
+
       'hasProblem': hasProblem,
       'problemDescription': problemDescription,
       'clientRating': clientRating,

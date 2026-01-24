@@ -43,7 +43,7 @@ class ChatView extends GetView<ChatController> {
         margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
         padding: EdgeInsets.symmetric(vertical: 10, horizontal: 14),
         decoration: BoxDecoration(
-          color: isMe ? Colors.blue : Colors.grey[300],
+          color: isMe ? Color(0xFFDE3344) : Colors.grey[300],
           borderRadius: BorderRadius.only(
             topLeft: Radius.circular(12),
             topRight: Radius.circular(12),
@@ -84,7 +84,7 @@ class ChatView extends GetView<ChatController> {
                     message.status == 'read' ? Icons.done_all : Icons.check,
                     size: 16,
                     color: message.status == 'read'
-                        ? Colors.lightBlueAccent
+                        ? Colors.white
                         : Colors.white70,
                   ),
                 ],

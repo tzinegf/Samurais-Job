@@ -77,7 +77,7 @@ class _LocationPickerViewState extends State<LocationPickerView> {
               child: Text('Confirmar Localização'),
               style: ElevatedButton.styleFrom(
                 padding: EdgeInsets.symmetric(vertical: 16),
-                backgroundColor: Colors.blue,
+                backgroundColor: Color(0xFFDE3344),
                 foregroundColor: Colors.white,
               ),
             ),

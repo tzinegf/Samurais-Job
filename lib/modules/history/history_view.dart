@@ -19,16 +19,18 @@ class HistoryView extends GetView<HistoryController> {
 
       if (controller.historyRequests.isEmpty) {
         return Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.history, size: 64, color: Colors.grey),
-              SizedBox(height: 16),
-              Text(
-                'Nenhum pedido finalizado encontrado.',
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-            ],
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.history, size: 64, color: Colors.grey),
+                SizedBox(height: 16),
+                Text(
+                  'Nenhum pedido finalizado encontrado.',
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
+              ],
+            ),
           ),
         );
       }

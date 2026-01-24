@@ -43,11 +43,7 @@ class MiniMapViewer extends StatelessWidget {
                   point: LatLng(latitude, longitude),
                   width: 40,
                   height: 40,
-                  child: Icon(
-                    Icons.location_pin,
-                    color: Colors.red,
-                    size: 40,
-                  ),
+                  child: Icon(Icons.location_pin, color: Colors.red, size: 40),
                 ),
               ],
             ),

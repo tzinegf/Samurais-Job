@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
 import '../../models/user_model.dart';
 import '../../routes/app_routes.dart';
 
@@ -10,6 +11,7 @@ class AuthController extends GetxController {
   Rxn<User> firebaseUser = Rxn<User>();
   Rxn<UserModel> currentUser = Rxn<UserModel>();
   RxBool isLoading = false.obs;
+  StreamSubscription<DocumentSnapshot>? _userSubscription;
 
   @override
   void onReady() {
@@ -19,8 +21,17 @@ class AuthController extends GetxController {
     ever(firebaseUser, _setInitialScreen);
   }
 
+  @override
+  void onClose() {
+    _userSubscription?.cancel();
+    super.onClose();
+  }
+
   _setInitialScreen(User? user) async {
+    _userSubscription?.cancel();
+
     if (user == null) {
+      currentUser.value = null;
       // Prevent redirect loop if already on login or register page
       if (Get.currentRoute == Routes.REGISTER ||
           Get.currentRoute == Routes.LOGIN) {
@@ -42,6 +53,18 @@ class AuthController extends GetxController {
 
         if (doc.exists) {
           currentUser.value = UserModel.fromDocument(doc); // Store user data
+
+          // Start listening to real-time updates
+          _userSubscription = _db
+              .collection('users')
+              .doc(user.uid)
+              .snapshots()
+              .listen((snapshot) {
+                if (snapshot.exists) {
+                  currentUser.value = UserModel.fromDocument(snapshot);
+                }
+              });
+
           String role = doc['role'];
           switch (role) {
             case 'client':
@@ -57,7 +80,12 @@ class AuthController extends GetxController {
               Get.offAllNamed(Routes.DASHBOARD_MODERATOR);
               break;
             default:
-              Get.snackbar("Erro", "Papel de usuário desconhecido.");
+              Get.snackbar(
+                "Erro",
+                "Papel de usuário desconhecido.",
+                backgroundColor: Colors.red,
+                colorText: Colors.white,
+              );
               await _auth.signOut();
               Get.offAllNamed(Routes.LOGIN);
           }
@@ -69,6 +97,8 @@ class AuthController extends GetxController {
           Get.snackbar(
             "Erro",
             "Perfil de usuário não encontrado no banco de dados.",
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
           );
           await _auth.signOut();
           Get.offAllNamed(Routes.LOGIN);
@@ -85,9 +115,42 @@ class AuthController extends GetxController {
       isLoading.value = true;
       await _auth.signInWithEmailAndPassword(email: email, password: password);
     } catch (e) {
-      Get.snackbar("Erro no Login", e.toString());
+      Get.snackbar(
+        "Erro no Login",
+        e.toString(),
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  Future<void> resetPassword(String email) async {
+    if (email.isEmpty) {
+      Get.snackbar(
+        "Atenção",
+        "Por favor, informe seu email.",
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+      );
+      return;
+    }
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+      Get.snackbar(
+        "Sucesso",
+        "Email de recuperação enviado para $email",
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+    } catch (e) {
+      Get.snackbar(
+        "Erro",
+        "Falha ao enviar email de recuperação: ${e.toString()}",
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
     }
   }
 
@@ -141,7 +204,12 @@ class AuthController extends GetxController {
           Get.offAllNamed(Routes.LOGIN);
       }
     } catch (e) {
-      Get.snackbar("Erro no Registro", e.toString());
+      Get.snackbar(
+        "Erro no Registro",
+        e.toString(),
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
     }
   }
 }
