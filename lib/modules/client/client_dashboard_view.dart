@@ -1491,6 +1491,10 @@ class ClientDashboardView extends GetView<ClientController> {
                               Get.snackbar(
                                 'Erro',
                                 'Por favor, descreva o problema.',
+                                backgroundColor: Colors.red,
+                                colorText: Colors.white,
+                                snackPosition: SnackPosition.BOTTOM,
+                                margin: EdgeInsets.all(16),
                               );
                               return;
                             }

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'register_controller.dart';
 import '../../models/category_model.dart';
 import '../../models/subcategory_model.dart';
+
+import '../../utils/phone_input_formatter.dart';
 
 class RegisterView extends GetView<RegisterController> {
   final RxBool isObscure = true.obs;
@@ -57,6 +60,7 @@ class RegisterView extends GetView<RegisterController> {
               label: 'Telefone',
               icon: Icons.phone_outlined,
               keyboardType: TextInputType.phone,
+              inputFormatters: [PhoneInputFormatter()],
             ),
             SizedBox(height: 16),
             _buildTextField(
@@ -248,6 +252,7 @@ class RegisterView extends GetView<RegisterController> {
     required IconData icon,
     bool isPassword = false,
     TextInputType keyboardType = TextInputType.text,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     if (isPassword) {
       return Obx(

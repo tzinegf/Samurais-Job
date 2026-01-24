@@ -5,6 +5,8 @@ import 'package:get/get.dart';
 import '../../utils/samurai_ranking_helper.dart';
 import 'profile_controller.dart';
 
+import '../../utils/phone_input_formatter.dart';
+
 class ProfileView extends GetView<ProfileController> {
   ImageProvider? _getBackgroundImage(File? selectedFile, String? avatarUrl) {
     if (selectedFile != null) {
