@@ -260,6 +260,7 @@ class RegisterView extends GetView<RegisterController> {
           controller: controller,
           obscureText: isObscure.value,
           keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
           decoration: _inputDecoration(label, icon).copyWith(
             suffixIcon: IconButton(
               icon: Icon(
@@ -277,6 +278,7 @@ class RegisterView extends GetView<RegisterController> {
       controller: controller,
       obscureText: false,
       keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
       decoration: _inputDecoration(label, icon),
     );
   }

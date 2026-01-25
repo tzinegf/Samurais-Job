@@ -7,6 +7,8 @@ class ServiceRequestModel {
   String title;
   String description;
   String category;
+  String? subcategory;
+  String? service;
   String status; // pending, accepted, completed, cancelled
   double? price;
   DateTime? createdAt;
@@ -39,6 +41,8 @@ class ServiceRequestModel {
     required this.title,
     required this.description,
     required this.category,
+    this.subcategory,
+    this.service,
     this.status = 'pending',
     this.price,
     this.createdAt,
@@ -68,6 +72,8 @@ class ServiceRequestModel {
       title: data['title'] ?? 'Sem Título',
       description: data['description'] ?? 'Sem Descrição',
       category: data['category'] ?? 'Outros',
+      subcategory: data['subcategory'],
+      service: data['service'],
       status: data['status'] ?? 'pending',
       price: (data['price'] is int)
           ? (data['price'] as int).toDouble()
@@ -106,6 +112,8 @@ class ServiceRequestModel {
       'title': title,
       'description': description,
       'category': category,
+      'subcategory': subcategory,
+      'service': service,
       'status': status,
       'price': price,
       'createdAt': createdAt ?? FieldValue.serverTimestamp(),

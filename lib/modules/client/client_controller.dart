@@ -5,6 +5,9 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../models/service_request_model.dart';
 import '../../models/quote_model.dart';
+import '../../models/category_model.dart';
+import '../../models/subcategory_model.dart';
+import '../../models/catalog_service_model.dart';
 import '../auth/auth_controller.dart';
 
 import '../../utils/ranking_system.dart';
@@ -16,34 +19,120 @@ class ClientController extends GetxController {
   final titleCtrl = TextEditingController();
   final descriptionCtrl = TextEditingController();
   final priceCtrl = TextEditingController();
-  RxString selectedCategory = ''.obs;
+
+  // Dynamic Catalog Data
+  RxList<CategoryModel> categories = <CategoryModel>[].obs;
+  Rx<CategoryModel?> selectedCategory = Rx<CategoryModel?>(null);
+
+  RxList<SubcategoryModel> subcategories = <SubcategoryModel>[].obs;
+  Rx<SubcategoryModel?> selectedSubcategory = Rx<SubcategoryModel?>(null);
+
+  RxList<CatalogServiceModel> services = <CatalogServiceModel>[].obs;
+  Rx<CatalogServiceModel?> selectedService = Rx<CatalogServiceModel?>(null);
+
+  RxBool isLoadingCatalog = false.obs;
+
   Rx<LatLng?> selectedLocation = Rx<LatLng?>(null); // New location field
   RxList<ServiceRequestModel> myRequests = <ServiceRequestModel>[].obs;
   RxBool isLoading = false.obs;
 
-  final List<String> categories = [
-    'Marceneiro',
-    'Encanador',
-    'Pedreiro',
-    'Eletricista',
-    'Pintor',
-    'Jardinagem',
-    'Limpeza',
-    'Mecânico',
-    'Informática',
-    'Montador de Móveis',
-    'Costureira',
-    'Cozinheiro',
-  ];
-
   @override
   void onInit() {
     super.onInit();
-    selectedCategory.value = categories.first;
+    fetchCategories();
 
     // Listen to auth changes to start fetching requests when user is ready
     ever(_authController.firebaseUser, (_) => fetchMyRequests());
     fetchMyRequests(); // Try initial fetch
+  }
+
+  Future<void> fetchCategories() async {
+    try {
+      isLoadingCatalog.value = true;
+      final snapshot = await _db.collection('categories').orderBy('nome').get();
+      categories.value = snapshot.docs
+          .map((doc) => CategoryModel.fromMap(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      print('Error fetching categories: $e');
+    } finally {
+      isLoadingCatalog.value = false;
+    }
+  }
+
+  Future<void> fetchSubcategories(String categoryId) async {
+    try {
+      isLoadingCatalog.value = true;
+      subcategories.clear();
+      services.clear();
+      selectedSubcategory.value = null;
+      selectedService.value = null;
+
+      final snapshot = await _db
+          .collection('subcategories')
+          .where('categoria_id', isEqualTo: categoryId)
+          .get();
+
+      subcategories.value = snapshot.docs
+          .map((doc) => SubcategoryModel.fromMap(doc.data(), doc.id))
+          .toList();
+
+      subcategories.sort((a, b) => a.name.compareTo(b.name));
+    } catch (e) {
+      print('Error fetching subcategories: $e');
+    } finally {
+      isLoadingCatalog.value = false;
+    }
+  }
+
+  Future<void> fetchServices(String subcategoryId) async {
+    try {
+      isLoadingCatalog.value = true;
+      services.clear();
+      selectedService.value = null;
+
+      final snapshot = await _db
+          .collection('services')
+          .where('subcategoria_id', isEqualTo: subcategoryId)
+          .where('ativo', isEqualTo: true)
+          .get();
+
+      services.value = snapshot.docs
+          .map((doc) => CatalogServiceModel.fromMap(doc.data(), doc.id))
+          .toList();
+
+      services.sort((a, b) => a.name.compareTo(b.name));
+    } catch (e) {
+      print('Error fetching services: $e');
+    } finally {
+      isLoadingCatalog.value = false;
+    }
+  }
+
+  void onCategorySelected(CategoryModel? category) {
+    selectedCategory.value = category;
+    if (category != null) {
+      fetchSubcategories(category.id);
+    } else {
+      subcategories.clear();
+      services.clear();
+      selectedSubcategory.value = null;
+      selectedService.value = null;
+    }
+  }
+
+  void onSubcategorySelected(SubcategoryModel? subcategory) {
+    selectedSubcategory.value = subcategory;
+    if (subcategory != null) {
+      fetchServices(subcategory.id);
+    } else {
+      services.clear();
+      selectedService.value = null;
+    }
+  }
+
+  void onServiceSelected(CatalogServiceModel? service) {
+    selectedService.value = service;
   }
 
   void fetchMyRequests() {
@@ -152,6 +241,16 @@ class ClientController extends GetxController {
       return;
     }
 
+    if (selectedCategory.value == null) {
+      Get.snackbar(
+        "Erro",
+        "Selecione uma categoria.",
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
     try {
       isLoading.value = true;
       String? uid = _authController.firebaseUser.value?.uid;
@@ -171,7 +270,9 @@ class ClientController extends GetxController {
         clientId: uid,
         title: titleCtrl.text.trim(),
         description: descriptionCtrl.text.trim(),
-        category: selectedCategory.value,
+        category: selectedCategory.value!.name,
+        subcategory: selectedSubcategory.value?.name,
+        service: selectedService.value?.name,
         price: price,
         status: 'pending',
         latitude: selectedLocation.value?.latitude,
@@ -193,6 +294,11 @@ class ClientController extends GetxController {
       descriptionCtrl.clear();
       priceCtrl.clear();
       selectedLocation.value = null;
+      selectedCategory.value = null;
+      selectedSubcategory.value = null;
+      selectedService.value = null;
+      subcategories.clear();
+      services.clear();
     } catch (e) {
       Get.snackbar(
         "Erro ao criar solicitação",
@@ -218,7 +324,7 @@ class ClientController extends GetxController {
       Map<String, dynamic> data = {
         'title': titleCtrl.text.trim(),
         'description': descriptionCtrl.text.trim(),
-        'category': selectedCategory.value,
+        'category': selectedCategory.value?.name ?? 'Outros',
         'price': price,
       };
 

@@ -2,10 +2,12 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../models/category_model.dart';
+import '../../models/subcategory_model.dart';
+import '../../models/catalog_service_model.dart';
 import '../../utils/samurai_ranking_helper.dart';
-import 'profile_controller.dart';
-
 import '../../utils/phone_input_formatter.dart';
+import 'profile_controller.dart';
 
 class ProfileView extends GetView<ProfileController> {
   ImageProvider? _getBackgroundImage(File? selectedFile, String? avatarUrl) {
@@ -96,7 +98,13 @@ class ProfileView extends GetView<ProfileController> {
               ),
               SizedBox(height: 24),
 
-              // Basic Info
+              // Dados Pessoais Section
+              Text(
+                'Dados Pessoais',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 16),
+
               TextField(
                 controller: TextEditingController(text: user.email),
                 readOnly: true,
@@ -121,12 +129,53 @@ class ProfileView extends GetView<ProfileController> {
               SizedBox(height: 16),
 
               TextField(
+                controller: controller.cpfController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'CPF',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.badge),
+                ),
+              ),
+              SizedBox(height: 16),
+
+              TextField(
+                controller: controller.rgController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'RG',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.perm_identity),
+                ),
+              ),
+              SizedBox(height: 16),
+
+              TextField(
                 controller: controller.phoneController,
                 keyboardType: TextInputType.phone,
+                inputFormatters: [PhoneInputFormatter()],
                 decoration: InputDecoration(
                   labelText: 'Telefone',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.phone),
+                ),
+              ),
+              SizedBox(height: 24),
+
+              // Endereço Section
+              Text(
+                'Endereço',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 16),
+
+              TextField(
+                controller: controller.cepController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'CEP',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.local_post_office),
                 ),
               ),
               SizedBox(height: 16),
@@ -138,6 +187,36 @@ class ProfileView extends GetView<ProfileController> {
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.location_on),
                 ),
+              ),
+              SizedBox(height: 16),
+
+              Row(
+                children: [
+                  Expanded(
+                    flex: 1,
+                    child: TextField(
+                      controller: controller.addressNumberController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Número',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.home_filled),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 16),
+                  Expanded(
+                    flex: 2,
+                    child: TextField(
+                      controller: controller.addressStateController,
+                      decoration: InputDecoration(
+                        labelText: 'Estado',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.map),
+                      ),
+                    ),
+                  ),
+                ],
               ),
               SizedBox(height: 16),
 
@@ -163,31 +242,33 @@ class ProfileView extends GetView<ProfileController> {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: controller.skillController,
-                        decoration: InputDecoration(
-                          hintText: 'Adicionar habilidade (ex: Encanador)',
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12),
-                        ),
-                        onSubmitted: (_) => controller.addSkill(),
-                      ),
+
+                // Add Skill Button (Catalog)
+                Obx(
+                  () => ElevatedButton.icon(
+                    onPressed: controller.skills.length >= 5
+                        ? null
+                        : () => _showAddSkillDialog(context),
+                    icon: Icon(Icons.add),
+                    label: Text(
+                      controller.skills.length >= 5
+                          ? 'Limite de 5 habilidades atingido'
+                          : 'Adicionar Habilidade do Catálogo',
                     ),
-                    SizedBox(width: 8),
-                    IconButton(
-                      onPressed: controller.addSkill,
-                      icon: Icon(
-                        Icons.add_circle,
-                        color: Color(0xFFDE3344),
-                        size: 32,
-                      ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xFFDE3344),
+                      foregroundColor: Colors.white,
+                      minimumSize: Size(double.infinity, 48),
+                      disabledBackgroundColor: Colors.grey[300],
+                      disabledForegroundColor: Colors.grey[600],
                     ),
-                  ],
+                  ),
                 ),
                 SizedBox(height: 16),
+
+                // Manual Entry (Optional, keeping for flexibility or removing if desired.
+                // User asked to search in categories, so catalog is primary.
+                // I'll keep manual as a secondary "Other" option if needed, but for now let's focus on the catalog button as requested)
                 Obx(
                   () => Wrap(
                     spacing: 8,
@@ -206,7 +287,6 @@ class ProfileView extends GetView<ProfileController> {
                   ),
                 ),
                 SizedBox(height: 24),
-                _buildDocumentsSection(controller),
               ],
 
               SizedBox(height: 32),
@@ -316,101 +396,159 @@ class ProfileView extends GetView<ProfileController> {
     );
   }
 
-  Widget _buildDocumentsSection(ProfileController controller) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Documentos',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+  void _showAddSkillDialog(BuildContext context) {
+    // Reset selection state when opening dialog
+    controller.selectedCategory.value = null;
+    controller.selectedSubcategory.value = null;
+    controller.selectedService.value = null;
+    controller.subcategories.clear();
+    controller.services.clear();
+
+    Get.bottomSheet(
+      Container(
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
         ),
-        SizedBox(height: 8),
-        Obx(() {
-          final docs = controller.documentUrls;
-          final newDocs = controller.newDocuments;
-
-          if (docs.isEmpty && newDocs.isEmpty) {
-            return Text(
-              'Nenhum documento enviado.',
-              style: TextStyle(color: Colors.grey),
-            );
-          }
-
-          return Wrap(
-            spacing: 8,
-            runSpacing: 8,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              ...docs.map(
-                (url) => _buildDocThumb(
-                  url,
-                  isUrl: true,
-                  onDelete: () => controller.removeExistingDocument(url),
-                ),
+              Text(
+                'Adicionar Habilidade',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
               ),
-              ...newDocs.asMap().entries.map(
-                (entry) => _buildDocThumb(
-                  entry.value.path,
-                  isUrl: false,
-                  onDelete: () => controller.removeNewDocument(entry.key),
+              SizedBox(height: 16),
+
+              // CATEGORY
+              Obx(() {
+                if (controller.isLoadingCatalog.value &&
+                    controller.categories.isEmpty) {
+                  return Center(child: CircularProgressIndicator());
+                }
+                return DropdownButtonFormField<CategoryModel>(
+                  value: controller.selectedCategory.value,
+                  decoration: InputDecoration(
+                    labelText: 'Categoria',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: controller.categories.map((CategoryModel cat) {
+                    return DropdownMenuItem<CategoryModel>(
+                      value: cat,
+                      child: Text(cat.name),
+                    );
+                  }).toList(),
+                  onChanged: controller.onCategorySelected,
+                );
+              }),
+              SizedBox(height: 16),
+
+              // SUBCATEGORY
+              Obx(() {
+                if (controller.selectedCategory.value == null)
+                  return SizedBox.shrink();
+
+                if (controller.isLoadingCatalog.value &&
+                    controller.subcategories.isEmpty) {
+                  return Center(child: CircularProgressIndicator());
+                }
+
+                return Column(
+                  children: [
+                    DropdownButtonFormField<SubcategoryModel>(
+                      value: controller.selectedSubcategory.value,
+                      decoration: InputDecoration(
+                        labelText: 'Subcategoria',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: controller.subcategories.map((
+                        SubcategoryModel sub,
+                      ) {
+                        return DropdownMenuItem<SubcategoryModel>(
+                          value: sub,
+                          child: Text(sub.name),
+                        );
+                      }).toList(),
+                      onChanged: controller.onSubcategorySelected,
+                    ),
+                    SizedBox(height: 16),
+                  ],
+                );
+              }),
+
+              // SERVICE
+              Obx(() {
+                if (controller.selectedSubcategory.value == null)
+                  return SizedBox.shrink();
+
+                if (controller.isLoadingCatalog.value &&
+                    controller.services.isEmpty) {
+                  return Center(child: CircularProgressIndicator());
+                }
+
+                if (controller.services.isEmpty) {
+                  return SizedBox.shrink(); // No specific services available
+                }
+
+                return Column(
+                  children: [
+                    DropdownButtonFormField<CatalogServiceModel>(
+                      value: controller.selectedService.value,
+                      decoration: InputDecoration(
+                        labelText: 'Serviço Específico (Opcional)',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: controller.services.map((CatalogServiceModel srv) {
+                        return DropdownMenuItem<CatalogServiceModel>(
+                          value: srv,
+                          child: Text(srv.name),
+                        );
+                      }).toList(),
+                      onChanged: controller.onServiceSelected,
+                    ),
+                    SizedBox(height: 16),
+                  ],
+                );
+              }),
+
+              // ADD BUTTON
+              ElevatedButton(
+                onPressed: () {
+                  String? skillToAdd;
+                  if (controller.selectedService.value != null) {
+                    skillToAdd = controller.selectedService.value!.name;
+                  } else if (controller.selectedSubcategory.value != null) {
+                    skillToAdd = controller.selectedSubcategory.value!.name;
+                  } else if (controller.selectedCategory.value != null) {
+                    skillToAdd = controller.selectedCategory.value!.name;
+                  }
+
+                  if (skillToAdd != null) {
+                    controller.addCatalogSkill(skillToAdd);
+                  } else {
+                    Get.snackbar(
+                      'Erro',
+                      'Selecione pelo menos uma categoria.',
+                      backgroundColor: Colors.red,
+                      colorText: Colors.white,
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFFDE3344),
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(vertical: 16),
                 ),
+                child: Text('Adicionar Habilidade'),
               ),
             ],
-          );
-        }),
-        SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: controller.pickDocument,
-          icon: Icon(Icons.upload_file),
-          label: Text('Adicionar Documento'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: Color(0xFFDE3344),
-            side: BorderSide(color: Color(0xFFDE3344)),
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildDocThumb(
-    String path, {
-    required bool isUrl,
-    required VoidCallback onDelete,
-  }) {
-    return Stack(
-      children: [
-        Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey[300]!),
-            borderRadius: BorderRadius.circular(8),
-            image: DecorationImage(
-              image: isUrl
-                  ? (path.startsWith('data:image')
-                            ? MemoryImage(base64Decode(path.split(',').last))
-                            : NetworkImage(path))
-                        as ImageProvider
-                  : FileImage(File(path)),
-              fit: BoxFit.cover,
-            ),
-          ),
-        ),
-        Positioned(
-          top: -2,
-          right: -2,
-          child: GestureDetector(
-            onTap: onDelete,
-            child: Container(
-              padding: EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                color: Colors.red,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.close, color: Colors.white, size: 16),
-            ),
-          ),
-        ),
-      ],
+      ),
+      isScrollControlled: true,
     );
   }
 }

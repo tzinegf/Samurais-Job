@@ -8,6 +8,9 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../modules/auth/auth_controller.dart';
 import '../../models/user_model.dart';
+import '../../models/category_model.dart';
+import '../../models/subcategory_model.dart';
+import '../../models/catalog_service_model.dart';
 
 class ProfileController extends GetxController {
   final AuthController _authController = Get.find<AuthController>();
@@ -17,16 +20,31 @@ class ProfileController extends GetxController {
 
   final TextEditingController nameController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
+  final TextEditingController cpfController = TextEditingController();
+  final TextEditingController rgController = TextEditingController();
   final TextEditingController bioController = TextEditingController();
   final TextEditingController addressController = TextEditingController();
+  final TextEditingController cepController = TextEditingController();
+  final TextEditingController addressNumberController = TextEditingController();
+  final TextEditingController addressStateController = TextEditingController();
   final TextEditingController skillController =
       TextEditingController(); // For adding new skills
 
   RxList<String> skills = <String>[].obs;
   Rx<File?> selectedImage = Rx<File?>(null);
-  RxList<String> documentUrls = <String>[].obs;
-  RxList<File> newDocuments = <File>[].obs;
   RxBool isLoading = false.obs;
+
+  // Dynamic Catalog Data for Skills
+  RxList<CategoryModel> categories = <CategoryModel>[].obs;
+  Rx<CategoryModel?> selectedCategory = Rx<CategoryModel?>(null);
+
+  RxList<SubcategoryModel> subcategories = <SubcategoryModel>[].obs;
+  Rx<SubcategoryModel?> selectedSubcategory = Rx<SubcategoryModel?>(null);
+
+  RxList<CatalogServiceModel> services = <CatalogServiceModel>[].obs;
+  Rx<CatalogServiceModel?> selectedService = Rx<CatalogServiceModel?>(null);
+
+  RxBool isLoadingCatalog = false.obs;
 
   Rx<UserModel?> get user => _authController.currentUser;
 
@@ -36,6 +54,96 @@ class ProfileController extends GetxController {
     // Increase upload timeout to avoid premature cancellation on slow connections
     _storage.setMaxUploadRetryTime(Duration(minutes: 5));
     _loadUserData();
+    fetchCategories();
+  }
+
+  Future<void> fetchCategories() async {
+    try {
+      isLoadingCatalog.value = true;
+      final snapshot = await _db.collection('categories').orderBy('nome').get();
+      categories.value = snapshot.docs
+          .map((doc) => CategoryModel.fromMap(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      print('Error fetching categories: $e');
+    } finally {
+      isLoadingCatalog.value = false;
+    }
+  }
+
+  Future<void> fetchSubcategories(String categoryId) async {
+    try {
+      isLoadingCatalog.value = true;
+      subcategories.clear();
+      services.clear();
+      selectedSubcategory.value = null;
+      selectedService.value = null;
+
+      final snapshot = await _db
+          .collection('subcategories')
+          .where('categoria_id', isEqualTo: categoryId)
+          .get();
+
+      subcategories.value = snapshot.docs
+          .map((doc) => SubcategoryModel.fromMap(doc.data(), doc.id))
+          .toList();
+
+      subcategories.sort((a, b) => a.name.compareTo(b.name));
+    } catch (e) {
+      print('Error fetching subcategories: $e');
+    } finally {
+      isLoadingCatalog.value = false;
+    }
+  }
+
+  Future<void> fetchServices(String subcategoryId) async {
+    try {
+      isLoadingCatalog.value = true;
+      services.clear();
+      selectedService.value = null;
+
+      final snapshot = await _db
+          .collection('services')
+          .where('subcategoria_id', isEqualTo: subcategoryId)
+          .where('ativo', isEqualTo: true)
+          .get();
+
+      services.value = snapshot.docs
+          .map((doc) => CatalogServiceModel.fromMap(doc.data(), doc.id))
+          .toList();
+
+      services.sort((a, b) => a.name.compareTo(b.name));
+    } catch (e) {
+      print('Error fetching services: $e');
+    } finally {
+      isLoadingCatalog.value = false;
+    }
+  }
+
+  void onCategorySelected(CategoryModel? category) {
+    selectedCategory.value = category;
+    if (category != null) {
+      fetchSubcategories(category.id);
+    } else {
+      subcategories.clear();
+      services.clear();
+      selectedSubcategory.value = null;
+      selectedService.value = null;
+    }
+  }
+
+  void onSubcategorySelected(SubcategoryModel? subcategory) {
+    selectedSubcategory.value = subcategory;
+    if (subcategory != null) {
+      fetchServices(subcategory.id);
+    } else {
+      services.clear();
+      selectedService.value = null;
+    }
+  }
+
+  void onServiceSelected(CatalogServiceModel? service) {
+    selectedService.value = service;
   }
 
   void _loadUserData() {
@@ -43,10 +151,14 @@ class ProfileController extends GetxController {
     if (currentUser != null) {
       nameController.text = currentUser.name;
       phoneController.text = currentUser.phone ?? '';
+      cpfController.text = currentUser.cpf ?? '';
+      rgController.text = currentUser.rg ?? '';
       bioController.text = currentUser.bio ?? '';
       addressController.text = currentUser.address ?? '';
+      cepController.text = currentUser.cep ?? '';
+      addressNumberController.text = currentUser.addressNumber ?? '';
+      addressStateController.text = currentUser.addressState ?? '';
       skills.value = List.from(currentUser.skills ?? []);
-      documentUrls.value = List.from(currentUser.documents ?? []);
     }
   }
 
@@ -66,42 +178,52 @@ class ProfileController extends GetxController {
     }
   }
 
-  Future<void> pickDocument() async {
-    try {
-      final XFile? image = await _picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 80,
-      );
-      if (image != null) {
-        newDocuments.add(File(image.path));
-      }
-    } catch (e) {
+  void addSkill() {
+    if (skills.length >= 5) {
       Get.snackbar(
-        'Erro',
-        'Não foi possível selecionar o documento: $e',
-        backgroundColor: Colors.red,
+        'Limite Atingido',
+        'Você só pode adicionar até 5 habilidades.',
+        backgroundColor: Colors.orange,
         colorText: Colors.white,
       );
+      return;
     }
-  }
 
-  void removeNewDocument(int index) {
-    newDocuments.removeAt(index);
-  }
-
-  void removeExistingDocument(String url) {
-    documentUrls.remove(url);
-    // Note: We are not deleting from Storage/Firestore immediately,
-    // only when saving. Or we could just remove from the list references.
-  }
-
-  void addSkill() {
     final skill = skillController.text.trim();
     if (skill.isNotEmpty && !skills.contains(skill)) {
       skills.add(skill);
       skillController.clear();
+    }
+  }
+
+  void addCatalogSkill(String skillName) {
+    if (skills.length >= 5) {
+      Get.snackbar(
+        'Limite Atingido',
+        'Você só pode adicionar até 5 habilidades.',
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    if (!skills.contains(skillName)) {
+      skills.add(skillName);
+      Get.back(); // Close bottom sheet if open
+      Get.snackbar(
+        'Sucesso',
+        'Habilidade "$skillName" adicionada!',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        duration: Duration(seconds: 2),
+      );
+    } else {
+      Get.snackbar(
+        'Aviso',
+        'Você já possui esta habilidade.',
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+      );
     }
   }
 
@@ -180,52 +302,34 @@ class ProfileController extends GetxController {
         }
       }
 
-      // Upload New Documents
-      List<String> finalDocumentUrls = List.from(documentUrls);
-
-      for (var i = 0; i < newDocuments.length; i++) {
-        File docFile = newDocuments[i];
-        String docUrl;
-        try {
-          final String docId = '${DateTime.now().millisecondsSinceEpoch}_$i';
-          final ref = _storage.ref().child(
-            'documents/${currentUser.id}/$docId.jpg',
-          );
-          final metadata = SettableMetadata(contentType: 'image/jpeg');
-          final taskSnapshot = await ref.putFile(docFile, metadata);
-          docUrl = await taskSnapshot.ref.getDownloadURL();
-        } catch (e) {
-          print('DEBUG: Document Storage failed ($e). Using Base64.');
-          final bytes = await docFile.readAsBytes();
-          final base64Image = base64Encode(bytes);
-          docUrl = 'data:image/jpeg;base64,$base64Image';
-        }
-        finalDocumentUrls.add(docUrl);
-      }
-
       // Update Firestore
       await _db.collection('users').doc(currentUser.id).update({
         'name': nameController.text.trim(),
         'phone': phoneController.text.trim(),
+        'cpf': cpfController.text.trim(),
+        'rg': rgController.text.trim(),
         'bio': bioController.text.trim(),
         'address': addressController.text.trim(),
+        'cep': cepController.text.trim(),
+        'addressNumber': addressNumberController.text.trim(),
+        'addressState': addressStateController.text.trim(),
         'skills': skills.toList(),
-        'documents': finalDocumentUrls,
         'avatarUrl': avatarUrl,
       });
 
       // Update Local State
       currentUser.name = nameController.text.trim();
       currentUser.phone = phoneController.text.trim();
+      currentUser.cpf = cpfController.text.trim();
+      currentUser.rg = rgController.text.trim();
       currentUser.bio = bioController.text.trim();
       currentUser.address = addressController.text.trim();
+      currentUser.cep = cepController.text.trim();
+      currentUser.addressNumber = addressNumberController.text.trim();
+      currentUser.addressState = addressStateController.text.trim();
       currentUser.skills = skills.toList();
-      currentUser.documents = finalDocumentUrls;
       currentUser.avatarUrl = avatarUrl;
 
-      // Clear new documents list
-      newDocuments.clear();
-      documentUrls.value = finalDocumentUrls;
       selectedImage.value = null; // Clear selected image
 
       _authController.currentUser.refresh();

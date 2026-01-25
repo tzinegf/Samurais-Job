@@ -101,11 +101,20 @@ class ProfessionalController extends GetxController {
 
     if (skills.isNotEmpty) {
       filtered = _allPendingRequests.where((req) {
+        final reqCategory = req.category.toLowerCase().trim();
+        final reqSubcategory = req.subcategory?.toLowerCase().trim();
+        final reqService = req.service?.toLowerCase().trim();
+
         // Case insensitive and trim check
-        return skills.any(
-          (skill) =>
-              skill.toLowerCase().trim() == req.category.toLowerCase().trim(),
-        );
+        return skills.any((skill) {
+          final s = skill.toLowerCase().trim();
+
+          if (s == reqCategory) return true;
+          if (reqSubcategory != null && s == reqSubcategory) return true;
+          if (reqService != null && s == reqService) return true;
+
+          return false;
+        });
       }).toList();
     } else {
       // Fallback: Show all if no skills defined

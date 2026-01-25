@@ -6,8 +6,13 @@ class UserModel {
   String email;
   String role;
   String? phone;
+  String? cpf;
+  String? rg;
   String? bio;
   String? address;
+  String? cep;
+  String? addressNumber;
+  String? addressState;
   List<String>? documents;
   String? avatarUrl;
   List<String>? skills;
@@ -24,8 +29,13 @@ class UserModel {
     required this.email,
     required this.role,
     this.phone,
+    this.cpf,
+    this.rg,
     this.bio,
     this.address,
+    this.cep,
+    this.addressNumber,
+    this.addressState,
     this.documents,
     this.avatarUrl,
     this.skills,
@@ -45,8 +55,13 @@ class UserModel {
       email: data['email'] ?? '',
       role: data['role'] ?? 'client',
       phone: data['phone'],
+      cpf: data['cpf'],
+      rg: data['rg'],
       bio: data['bio'],
       address: data['address'],
+      cep: data['cep'],
+      addressNumber: data['addressNumber'],
+      addressState: data['addressState'],
       documents: data['documents'] != null
           ? List<String>.from(data['documents'])
           : [],
@@ -69,8 +84,13 @@ class UserModel {
       'email': email,
       'role': role,
       'phone': phone,
+      'cpf': cpf,
+      'rg': rg,
       'bio': bio,
       'address': address,
+      'cep': cep,
+      'addressNumber': addressNumber,
+      'addressState': addressState,
       'documents': documents,
       'avatarUrl': avatarUrl,
       'skills': skills,

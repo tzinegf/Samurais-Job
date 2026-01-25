@@ -107,17 +107,50 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
               SizedBox(height: 8),
               Row(
                 children: [
-                  Chip(label: Text(request.category)),
-                  SizedBox(width: 8),
-                  Text(
-                    'R\$ ${request.price?.toStringAsFixed(2) ?? 'A combinar'}',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green,
-                    ),
+                  Chip(
+                    label: Text(request.category),
+                    backgroundColor: Color(0xFFDE3344),
+                    labelStyle: TextStyle(color: Colors.white),
                   ),
+                  SizedBox(width: 8),
+                  if (request.subcategory != null) ...[
+                    Chip(
+                      label: Text(request.subcategory!),
+                      backgroundColor: Colors.grey[200],
+                    ),
+                    SizedBox(width: 8),
+                  ],
                 ],
+              ),
+              if (request.service != null) ...[
+                SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.build_circle_outlined,
+                      size: 16,
+                      color: Colors.grey[600],
+                    ),
+                    SizedBox(width: 4),
+                    Text(
+                      request.service!,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              SizedBox(height: 16),
+              Text(
+                'R\$ ${request.price?.toStringAsFixed(2) ?? 'A combinar'}',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green,
+                ),
               ),
               SizedBox(height: 16),
               Text(
@@ -690,6 +723,22 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
                                     materialTapTargetSize:
                                         MaterialTapTargetSize.shrinkWrap,
                                   ),
+                                  if (request.subcategory != null) ...[
+                                    SizedBox(width: 4),
+                                    Chip(
+                                      label: Text(
+                                        request.subcategory!,
+                                        style: TextStyle(
+                                          color: Colors.black87,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      backgroundColor: Colors.grey[200],
+                                      padding: EdgeInsets.zero,
+                                      materialTapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                  ],
                                   if (request.quotedBy.contains(
                                     Get.find<AuthController>()
                                         .currentUser
@@ -792,6 +841,27 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
+                          if (request.service != null) ...[
+                            SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.build_circle_outlined,
+                                  size: 14,
+                                  color: Colors.grey[600],
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  request.service!,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey[700],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                           SizedBox(height: 8),
                           Text(
                             request.description,
@@ -919,6 +989,25 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
                           fontWeight: FontWeight.w500,
                         ),
                       ),
+                      if (request.subcategory != null) ...[
+                        SizedBox(width: 8),
+                        Container(
+                          width: 4,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.grey[400],
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          request.subcategory!,
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                   if (!isAvailable)
@@ -963,6 +1052,27 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
                 request.title,
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
+              if (request.service != null) ...[
+                SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.build_circle_outlined,
+                      size: 14,
+                      color: Colors.grey[600],
+                    ),
+                    SizedBox(width: 4),
+                    Text(
+                      request.service!,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               SizedBox(height: 4),
               Text(
                 request.createdAt != null

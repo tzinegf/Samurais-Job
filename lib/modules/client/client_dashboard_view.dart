@@ -5,6 +5,9 @@ import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 import '../../models/service_request_model.dart';
 import '../../models/quote_model.dart';
+import '../../models/category_model.dart';
+import '../../models/subcategory_model.dart';
+import '../../models/catalog_service_model.dart';
 import '../../routes/app_routes.dart';
 import '../../utils/ranking_system.dart';
 import '../history/history_view.dart';
@@ -1059,7 +1062,11 @@ class ClientDashboardView extends GetView<ClientController> {
     controller.titleCtrl.clear();
     controller.descriptionCtrl.clear();
     controller.priceCtrl.clear();
-    controller.selectedCategory.value = controller.categories.first;
+    controller.selectedCategory.value = null;
+    controller.selectedSubcategory.value = null;
+    controller.subcategories.clear();
+    controller.services.clear();
+    controller.selectedService.value = null;
     controller.selectedLocation.value = null;
 
     // Auto-fetch location
@@ -1089,25 +1096,104 @@ class ClientDashboardView extends GetView<ClientController> {
                   ),
                 ),
                 SizedBox(height: 16),
+
+                // CATEGORY
                 Obx(
-                  () => DropdownButtonFormField<String>(
+                  () => DropdownButtonFormField<CategoryModel>(
                     value: controller.selectedCategory.value,
                     decoration: InputDecoration(
                       labelText: 'Categoria',
                       border: OutlineInputBorder(),
                     ),
-                    items: controller.categories.map((String category) {
-                      return DropdownMenuItem<String>(
+                    items: controller.categories.map((CategoryModel category) {
+                      return DropdownMenuItem<CategoryModel>(
                         value: category,
-                        child: Text(category),
+                        child: Text(category.name),
                       );
                     }).toList(),
-                    onChanged: (newValue) {
-                      controller.selectedCategory.value = newValue!;
-                    },
+                    onChanged: controller.onCategorySelected,
                   ),
                 ),
                 SizedBox(height: 16),
+
+                // SUBCATEGORY
+                Obx(() {
+                  if (controller.selectedCategory.value == null)
+                    return SizedBox.shrink();
+                  if (controller.isLoadingCatalog.value &&
+                      controller.subcategories.isEmpty) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  }
+                  return Column(
+                    children: [
+                      DropdownButtonFormField<SubcategoryModel>(
+                        value: controller.selectedSubcategory.value,
+                        decoration: InputDecoration(
+                          labelText: 'Subcategoria',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: controller.subcategories.map((
+                          SubcategoryModel sub,
+                        ) {
+                          return DropdownMenuItem<SubcategoryModel>(
+                            value: sub,
+                            child: Text(sub.name),
+                          );
+                        }).toList(),
+                        onChanged: controller.onSubcategorySelected,
+                      ),
+                      SizedBox(height: 16),
+                    ],
+                  );
+                }),
+
+                // SERVICES
+                Obx(() {
+                  if (controller.selectedSubcategory.value == null)
+                    return SizedBox.shrink();
+                  if (controller.isLoadingCatalog.value &&
+                      controller.services.isEmpty) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  }
+                  if (controller.services.isEmpty) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0),
+                      child: Text('Nenhum serviço específico disponível.'),
+                    );
+                  }
+                  return Column(
+                    children: [
+                      DropdownButtonFormField<CatalogServiceModel>(
+                        value: controller.selectedService.value,
+                        decoration: InputDecoration(
+                          labelText: 'Serviço',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: controller.services.map((
+                          CatalogServiceModel srv,
+                        ) {
+                          return DropdownMenuItem<CatalogServiceModel>(
+                            value: srv,
+                            child: Text(srv.name),
+                          );
+                        }).toList(),
+                        onChanged: controller.onServiceSelected,
+                      ),
+                      SizedBox(height: 16),
+                    ],
+                  );
+                }),
+
                 TextField(
                   controller: controller.descriptionCtrl,
                   decoration: InputDecoration(
@@ -1204,10 +1290,14 @@ class ClientDashboardView extends GetView<ClientController> {
     controller.titleCtrl.text = request.title;
     controller.descriptionCtrl.text = request.description;
     controller.priceCtrl.text = request.price?.toStringAsFixed(2) ?? '';
-    if (controller.categories.contains(request.category)) {
-      controller.selectedCategory.value = request.category;
-    } else {
-      controller.selectedCategory.value = controller.categories.first;
+
+    // Attempt to find existing category
+    try {
+      controller.selectedCategory.value = controller.categories.firstWhere(
+        (c) => c.name == request.category,
+      );
+    } catch (_) {
+      controller.selectedCategory.value = null;
     }
 
     Get.dialog(
@@ -1235,20 +1325,20 @@ class ClientDashboardView extends GetView<ClientController> {
                 ),
                 SizedBox(height: 16),
                 Obx(
-                  () => DropdownButtonFormField<String>(
+                  () => DropdownButtonFormField<CategoryModel>(
                     value: controller.selectedCategory.value,
                     decoration: InputDecoration(
                       labelText: 'Categoria',
                       border: OutlineInputBorder(),
                     ),
-                    items: controller.categories.map((String category) {
-                      return DropdownMenuItem<String>(
+                    items: controller.categories.map((CategoryModel category) {
+                      return DropdownMenuItem<CategoryModel>(
                         value: category,
-                        child: Text(category),
+                        child: Text(category.name),
                       );
                     }).toList(),
                     onChanged: (newValue) {
-                      controller.selectedCategory.value = newValue!;
+                      controller.selectedCategory.value = newValue;
                     },
                   ),
                 ),
