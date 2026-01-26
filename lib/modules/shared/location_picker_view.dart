@@ -45,9 +45,9 @@ class _LocationPickerViewState extends State<LocationPickerView> {
               initialCenter: _currentCenter,
               initialZoom: 15.0,
               onPositionChanged: (position, hasGesture) {
-                if (hasGesture && position.center != null) {
+                if (hasGesture) {
                   setState(() {
-                    _currentCenter = position.center!;
+                    _currentCenter = position.center;
                   });
                 }
               },

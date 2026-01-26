@@ -1,6 +1,6 @@
 import 'package:get/get.dart';
 import 'professional_controller.dart';
-import '../history/history_controller.dart';
+import '../../history/history_controller.dart';
 
 class ProfessionalBinding extends Bindings {
   @override

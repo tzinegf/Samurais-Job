@@ -33,9 +33,10 @@ class AuthController extends GetxController {
 
     if (user == null) {
       currentUser.value = null;
-      // Prevent redirect loop if already on login or register page
+      // Prevent redirect loop if already on login, register or splash page
       if (Get.currentRoute == Routes.REGISTER ||
-          Get.currentRoute == Routes.LOGIN) {
+          Get.currentRoute == Routes.LOGIN ||
+          Get.currentRoute == Routes.SPLASH) {
         return;
       }
       Get.offAllNamed(Routes.LOGIN);
@@ -61,35 +62,15 @@ class AuthController extends GetxController {
               .doc(user.uid)
               .snapshots()
               .listen((snapshot) {
-                if (snapshot.exists) {
-                  currentUser.value = UserModel.fromDocument(snapshot);
-                }
-              });
+            if (snapshot.exists) {
+              currentUser.value = UserModel.fromDocument(snapshot);
+            }
+          });
 
-          String role = doc['role'];
-          switch (role) {
-            case 'client':
-              Get.offAllNamed(Routes.DASHBOARD_CLIENT);
-              break;
-            case 'professional':
-              Get.offAllNamed(Routes.DASHBOARD_PROFESSIONAL);
-              break;
-            case 'admin':
-              Get.offAllNamed(Routes.DASHBOARD_ADMIN);
-              break;
-            case 'moderator':
-              Get.offAllNamed(Routes.DASHBOARD_MODERATOR);
-              break;
-            default:
-              Get.snackbar(
-                "Erro",
-                "Papel de usuário desconhecido.",
-                backgroundColor: Colors.red,
-                colorText: Colors.white,
-              );
-              await _auth.signOut();
-              Get.offAllNamed(Routes.LOGIN);
-          }
+          // If on splash, don't redirect yet
+          if (Get.currentRoute == Routes.SPLASH) return;
+
+          redirectUser();
         } else {
           // Se o documento não existe mas estamos na tela de registro,
           // não redirecionar para Login, pois o registerUser fará isso.
@@ -108,6 +89,34 @@ class AuthController extends GetxController {
         // If error (e.g. offline), stay on login or show error
         print("Auth Check Error: $e");
       }
+    }
+  }
+
+  void redirectUser() async {
+    if (currentUser.value == null) return;
+    String role = currentUser.value!.role;
+    switch (role) {
+      case 'client':
+        Get.offAllNamed(Routes.DASHBOARD_CLIENT);
+        break;
+      case 'professional':
+        Get.offAllNamed(Routes.DASHBOARD_PROFESSIONAL);
+        break;
+      case 'admin':
+        Get.offAllNamed(Routes.DASHBOARD_ADMIN);
+        break;
+      case 'moderator':
+        Get.offAllNamed(Routes.DASHBOARD_MODERATOR);
+        break;
+      default:
+        Get.snackbar(
+          "Erro",
+          "Papel de usuário desconhecido.",
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        await _auth.signOut();
+        Get.offAllNamed(Routes.LOGIN);
     }
   }
 

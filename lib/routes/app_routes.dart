@@ -11,4 +11,5 @@ abstract class Routes {
   static const BUY_COINS = '/buy-coins';
   static const PROFILE = '/profile';
   static const PROFESSIONAL_SETTINGS = '/professional-settings';
+  static const MANIFESTO = '/manifesto';
 }

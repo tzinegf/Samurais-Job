@@ -3,20 +3,20 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
-import '../../models/service_request_model.dart';
-import '../../models/quote_model.dart';
-import '../../models/category_model.dart';
-import '../../models/subcategory_model.dart';
-import '../../models/catalog_service_model.dart';
-import '../../routes/app_routes.dart';
-import '../../utils/ranking_system.dart';
-import '../history/history_view.dart';
-import '../auth/auth_controller.dart';
+import '../../../models/service_request_model.dart';
+import '../../../models/quote_model.dart';
+import '../../../models/category_model.dart';
+import '../../../models/subcategory_model.dart';
+import '../../../models/catalog_service_model.dart';
+import '../../../routes/app_routes.dart';
+import '../../../utils/ranking_system.dart';
+import '../../history/history_view.dart';
+import '../../auth/auth_controller.dart';
 import 'client_controller.dart';
-import '../shared/location_picker_view.dart';
-import '../shared/mini_map_viewer.dart';
+import '../../shared/location_picker_view.dart';
+import '../../shared/mini_map_viewer.dart';
 
-import '../../services/database_seeder.dart';
+import '../../../services/database_seeder.dart';
 
 ImageProvider? _getAvatarImage(String? avatarUrl) {
   if (avatarUrl != null && avatarUrl.isNotEmpty) {
@@ -157,6 +157,15 @@ class ClientDashboardView extends GetView<ClientController> {
                 },
               ),
             ],
+            Divider(),
+            ListTile(
+              leading: Icon(Icons.history_edu, color: Color(0xFFDE3344)),
+              title: Text('Manifesto Samurai'),
+              onTap: () {
+                Get.back();
+                Get.toNamed(Routes.MANIFESTO);
+              },
+            ),
             Divider(),
             ListTile(
               leading: Icon(Icons.exit_to_app, color: Colors.red),

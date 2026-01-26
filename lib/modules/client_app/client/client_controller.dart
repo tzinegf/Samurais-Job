@@ -3,14 +3,14 @@ import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
-import '../../models/service_request_model.dart';
-import '../../models/quote_model.dart';
-import '../../models/category_model.dart';
-import '../../models/subcategory_model.dart';
-import '../../models/catalog_service_model.dart';
-import '../auth/auth_controller.dart';
+import '../../../models/service_request_model.dart';
+import '../../../models/quote_model.dart';
+import '../../../models/category_model.dart';
+import '../../../models/subcategory_model.dart';
+import '../../../models/catalog_service_model.dart';
+import '../../auth/auth_controller.dart';
 
-import '../../utils/ranking_system.dart';
+import '../../../utils/ranking_system.dart';
 
 class ClientController extends GetxController {
   final AuthController _authController = Get.find();

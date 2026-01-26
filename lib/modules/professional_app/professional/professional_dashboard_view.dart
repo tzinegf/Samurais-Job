@@ -4,13 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
-import '../../models/service_request_model.dart';
-import '../../routes/app_routes.dart';
-import '../../utils/ranking_system.dart';
-import '../history/history_view.dart';
+import '../../../models/service_request_model.dart';
+import '../../../routes/app_routes.dart';
+import '../../../utils/ranking_system.dart';
+import '../../history/history_view.dart';
 import 'professional_controller.dart';
-import '../auth/auth_controller.dart';
-import '../shared/mini_map_viewer.dart';
+import '../../auth/auth_controller.dart';
+import '../../shared/mini_map_viewer.dart';
 
 ImageProvider? _getAvatarImage(String? avatarUrl) {
   if (avatarUrl != null && avatarUrl.isNotEmpty) {
@@ -1712,6 +1712,15 @@ class _ProfessionalDrawer extends StatelessWidget {
                 onTap: () {
                   Get.back();
                   Get.toNamed(Routes.PROFESSIONAL_SETTINGS);
+                },
+              ),
+              Divider(),
+              ListTile(
+                leading: Icon(Icons.history_edu, color: Color(0xFFDE3344)),
+                title: Text('Manifesto Samurai'),
+                onTap: () {
+                  Get.back();
+                  Get.toNamed(Routes.MANIFESTO);
                 },
               ),
               Divider(),

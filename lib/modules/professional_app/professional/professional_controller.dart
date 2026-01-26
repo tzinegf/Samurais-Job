@@ -4,9 +4,9 @@ import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
-import '../../models/service_request_model.dart';
-import '../../utils/ranking_system.dart';
-import '../auth/auth_controller.dart';
+import '../../../models/service_request_model.dart';
+import '../../../utils/ranking_system.dart';
+import '../../auth/auth_controller.dart';
 
 class ProfessionalController extends GetxController {
   final AuthController _authController = Get.find<AuthController>();
