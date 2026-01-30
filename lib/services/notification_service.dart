@@ -1,10 +1,13 @@
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/notification_model.dart';
 import '../modules/auth/auth_controller.dart';
 import '../models/service_request_model.dart';
+import '../routes/app_routes.dart';
 
 class NotificationService extends GetxService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -46,6 +49,32 @@ class NotificationService extends GetxService {
     }
   }
 
+  void navigateFromNotification(String type, String? relatedId) {
+    print('DEBUG: Navegando para notificação: $type, ID: $relatedId');
+
+    if (relatedId == null) {
+      Get.toNamed(Routes.NOTIFICATIONS);
+      return;
+    }
+
+    if (type == 'chat') {
+      Get.toNamed(
+        Routes.CHAT,
+        arguments: {'requestId': relatedId, 'requestTitle': null},
+      );
+    } else if (type == 'request' || type == 'new_request') {
+      Get.toNamed(Routes.DASHBOARD_PROFESSIONAL);
+    } else if (type == 'quote' ||
+        type == 'cancellation' ||
+        type == 'order_accepted' ||
+        type == 'order_adjustment' ||
+        type == 'order_cancelled') {
+      Get.toNamed(Routes.HISTORY);
+    } else {
+      Get.toNamed(Routes.NOTIFICATIONS);
+    }
+  }
+
   Future<void> _initLocalNotifications() async {
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -58,6 +87,17 @@ class NotificationService extends GetxService {
       onDidReceiveNotificationResponse: (NotificationResponse response) async {
         // Handle notification tap
         print('Notification tapped with payload: ${response.payload}');
+        if (response.payload != null) {
+          try {
+            final data = jsonDecode(response.payload!);
+            final type = data['type'];
+            final requestId = data['requestId'];
+            navigateFromNotification(type, requestId);
+          } catch (e) {
+            print('Erro ao processar payload da notificação: $e');
+            Get.toNamed(Routes.NOTIFICATIONS);
+          }
+        }
       },
     );
 
@@ -120,18 +160,53 @@ class NotificationService extends GetxService {
     required String type,
     String? relatedId,
   }) async {
+    // Check for duplicates if relatedId is present
+    if (relatedId != null) {
+      // 1. Check Local History (SharedPreferences) - Persistent across app restarts and deletes
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'notified_${type}_$relatedId';
+      if (prefs.getBool(key) == true) {
+        print(
+          'DEBUG: Notificação já processada anteriormente (Local History): $key',
+        );
+        return;
+      }
+
+      // 2. Check Firestore (in case local data was cleared but notification exists)
+      final existingDocs = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('notifications')
+          .where('relatedId', isEqualTo: relatedId)
+          .limit(1)
+          .get();
+
+      if (existingDocs.docs.isNotEmpty) {
+        print(
+          'DEBUG: Notificação duplicada evitada para relatedId: $relatedId',
+        );
+        // Sync local history if missing
+        await prefs.setBool(key, true);
+        return;
+      }
+
+      // Mark as processed locally
+      await prefs.setBool(key, true);
+    }
+
     // 1. Show Local Notification IMMEDIATELY (independent of Firestore)
     // Using hashcode of relatedId or random if null, but ensuring unique ID logic
-    int notificationId = relatedId != null
-        ? relatedId.hashCode
-        : DateTime.now().millisecondsSinceEpoch.remainder(100000);
+    // int notificationId = relatedId != null
+    //     ? relatedId.hashCode
+    //     : DateTime.now().millisecondsSinceEpoch.remainder(100000);
 
-    showLocalNotification(
-      id: notificationId,
-      title: title,
-      body: body,
-      payload: relatedId,
-    );
+    // COMMENTED OUT TO AVOID DUPLICATE NOTIFICATIONS WITH BACKGROUND SERVICE
+    // showLocalNotification(
+    //   id: notificationId,
+    //   title: title,
+    //   body: body,
+    //   payload: relatedId,
+    // );
 
     // 2. Save to Firestore
     try {
@@ -157,7 +232,7 @@ class NotificationService extends GetxService {
         duration: Duration(seconds: 4),
         icon: Icon(Icons.notifications_active, color: Color(0xFFDE3344)),
         onTap: (_) {
-          // Handle tap if needed
+          navigateFromNotification(type, relatedId);
         },
       );
     } catch (e) {

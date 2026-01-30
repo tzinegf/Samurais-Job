@@ -8,7 +8,7 @@ class ChatView extends GetView<ChatController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(controller.requestTitle)),
+      appBar: AppBar(title: Obx(() => Text(controller.requestTitle.value))),
       body: Column(
         children: [
           Expanded(

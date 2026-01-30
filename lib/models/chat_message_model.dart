@@ -7,6 +7,7 @@ class ChatMessageModel {
   final DateTime timestamp;
   final String senderName;
   final String status; // sent, read
+  final String? receiverId;
 
   ChatMessageModel({
     required this.id,
@@ -15,6 +16,7 @@ class ChatMessageModel {
     required this.timestamp,
     required this.senderName,
     this.status = 'sent',
+    this.receiverId,
   });
 
   factory ChatMessageModel.fromFirestore(DocumentSnapshot doc) {
@@ -26,6 +28,7 @@ class ChatMessageModel {
       timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
       senderName: data['senderName'] ?? '',
       status: data['status'] ?? 'sent',
+      receiverId: data['receiverId'],
     );
   }
 
@@ -36,6 +39,7 @@ class ChatMessageModel {
       'timestamp': FieldValue.serverTimestamp(),
       'senderName': senderName,
       'status': status,
+      'receiverId': receiverId,
     };
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import '../../services/notification_service.dart';
 import 'notifications_controller.dart';
 
 class NotificationsView extends GetView<NotificationsController> {
@@ -93,7 +94,17 @@ class NotificationsView extends GetView<NotificationsController> {
                     if (!notification.isRead && notification.id != null) {
                       controller.markAsRead(notification.id!);
                     }
-                    // Handle navigation if relatedId is present (optional for now)
+                    // Handle navigation
+                    try {
+                      final notificationService =
+                          Get.find<NotificationService>();
+                      notificationService.navigateFromNotification(
+                        notification.type,
+                        notification.relatedId,
+                      );
+                    } catch (e) {
+                      print('Erro ao navegar da notificação: $e');
+                    }
                   },
                 ),
               ),

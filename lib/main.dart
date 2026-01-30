@@ -5,12 +5,22 @@ import 'firebase_options.dart';
 import 'routes/app_pages.dart';
 import 'modules/auth/auth_binding.dart';
 
+import 'services/background_service.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // TODO: Run 'flutterfire configure' to generate firebase_options.dart and uncomment the following line
   // await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Initialize Background Service for notifications
+  try {
+    await initializeBackgroundService();
+    print('DEBUG: Background Service initialized');
+  } catch (e) {
+    print('ERROR: Failed to initialize Background Service: $e');
+  }
 
   runApp(
     GetMaterialApp(
