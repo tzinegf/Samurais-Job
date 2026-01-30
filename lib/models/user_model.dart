@@ -53,7 +53,7 @@ class UserModel {
       id: doc.id,
       name: data['name'] ?? '',
       email: data['email'] ?? '',
-      role: data['role'] ?? 'client',
+      role: data['role'] ?? 'professional',
       phone: data['phone'],
       cpf: data['cpf'],
       rg: data['rg'],

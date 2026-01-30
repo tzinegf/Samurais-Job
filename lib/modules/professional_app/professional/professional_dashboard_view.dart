@@ -11,6 +11,7 @@ import '../../history/history_view.dart';
 import 'professional_controller.dart';
 import '../../auth/auth_controller.dart';
 import '../../shared/mini_map_viewer.dart';
+import '../../../services/notification_service.dart';
 
 ImageProvider? _getAvatarImage(String? avatarUrl) {
   if (avatarUrl != null && avatarUrl.isNotEmpty) {
@@ -42,6 +43,58 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
                 floating: false,
                 pinned: true,
                 title: Text('Painel do Profissional'),
+                actions: [
+                  Stack(
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.notifications),
+                        onPressed: () => Get.toNamed(Routes.NOTIFICATIONS),
+                      ),
+                      Obx(() {
+                        final notificationService =
+                            Get.find<NotificationService>();
+                        if (notificationService.unreadCount.value > 0) {
+                          return Positioned(
+                            right: 8,
+                            top: 8,
+                            child: Container(
+                              padding: EdgeInsets.all(2),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                              constraints: BoxConstraints(
+                                minWidth: 16,
+                                minHeight: 16,
+                              ),
+                              child: Container(
+                                padding: EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                                constraints: BoxConstraints(
+                                  minWidth: 12,
+                                  minHeight: 12,
+                                ),
+                                child: Text(
+                                  '${notificationService.unreadCount.value}',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+                        return SizedBox.shrink();
+                      }),
+                    ],
+                  ),
+                ],
               ),
               SliverToBoxAdapter(child: _ProfessionalHeader()),
               SliverPersistentHeader(
@@ -695,6 +748,8 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
               itemBuilder: (context, index) {
                 final request = controller.availableRequests[index];
                 return Card(
+                  color: Colors.white,
+                  surfaceTintColor: Colors.white,
                   margin: EdgeInsets.only(bottom: 16),
                   elevation: 4,
                   shape: RoundedRectangleBorder(
@@ -709,111 +764,114 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Row(
-                                children: [
-                                  Chip(
-                                    label: Text(
-                                      request.category,
-                                      style: TextStyle(color: Colors.white),
-                                    ),
-                                    backgroundColor: Color(0xFFDE3344),
-                                    padding: EdgeInsets.zero,
-                                    materialTapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                  ),
-                                  if (request.subcategory != null) ...[
-                                    SizedBox(width: 4),
+                              Expanded(
+                                child: Wrap(
+                                  spacing: 6,
+                                  runSpacing: 4,
+                                  children: [
                                     Chip(
                                       label: Text(
-                                        request.subcategory!,
-                                        style: TextStyle(
-                                          color: Colors.black87,
-                                          fontSize: 12,
-                                        ),
+                                        request.category,
+                                        style: TextStyle(color: Colors.white),
                                       ),
-                                      backgroundColor: Colors.grey[200],
+                                      backgroundColor: Color(0xFFDE3344),
                                       padding: EdgeInsets.zero,
                                       materialTapTargetSize:
                                           MaterialTapTargetSize.shrinkWrap,
                                     ),
-                                  ],
-                                  if (request.quotedBy.contains(
-                                    Get.find<AuthController>()
-                                        .currentUser
-                                        .value
-                                        ?.id,
-                                  )) ...[
-                                    SizedBox(width: 8),
-                                    StreamBuilder<QuerySnapshot>(
-                                      stream: FirebaseFirestore.instance
-                                          .collection('service_requests')
-                                          .doc(request.id)
-                                          .collection('quotes')
-                                          .where(
-                                            'professionalId',
-                                            isEqualTo:
-                                                Get.find<AuthController>()
-                                                    .currentUser
-                                                    .value
-                                                    ?.id,
-                                          )
-                                          .limit(1)
-                                          .snapshots(),
-                                      builder: (context, snapshot) {
-                                        String text = 'Proposta Enviada';
-                                        Color color = Colors.orange.shade100;
-                                        Color textColor =
-                                            Colors.orange.shade900;
+                                    if (request.subcategory != null) ...[
+                                      Chip(
+                                        label: Text(
+                                          request.subcategory!,
+                                          style: TextStyle(
+                                            color: Colors.black87,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                        backgroundColor: Colors.grey[200],
+                                        padding: EdgeInsets.zero,
+                                        materialTapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                    ],
+                                    if (request.quotedBy.contains(
+                                      Get.find<AuthController>()
+                                          .currentUser
+                                          .value
+                                          ?.id,
+                                    ))
+                                      StreamBuilder<QuerySnapshot>(
+                                        stream: FirebaseFirestore.instance
+                                            .collection('service_requests')
+                                            .doc(request.id)
+                                            .collection('quotes')
+                                            .where(
+                                              'professionalId',
+                                              isEqualTo:
+                                                  Get.find<AuthController>()
+                                                      .currentUser
+                                                      .value
+                                                      ?.id,
+                                            )
+                                            .limit(1)
+                                            .snapshots(),
+                                        builder: (context, snapshot) {
+                                          String text = 'Proposta Enviada';
+                                          Color color = Colors.blue.shade100;
+                                          Color textColor =
+                                              Colors.blue.shade900;
 
-                                        if (snapshot.hasData &&
-                                            snapshot.data!.docs.isNotEmpty) {
-                                          final data =
-                                              snapshot.data!.docs.first.data()
-                                                  as Map<String, dynamic>;
-                                          if (data['status'] == 'rejected') {
-                                            text = 'Proposta Recusada';
-                                            color = Colors.red.shade100;
-                                            textColor = Colors.red.shade900;
-                                          } else if (data['status'] ==
-                                              'accepted') {
-                                            text = 'Proposta Aceita';
-                                            color = Colors.green.shade100;
-                                            textColor = Colors.green.shade900;
-                                          } else if (data['status'] ==
-                                              'adjustment_requested') {
-                                            text = 'Ajuste Solicitado';
-                                            color = Colors.orange.shade100;
-                                            textColor = Colors.orange.shade900;
+                                          if (snapshot.hasData &&
+                                              snapshot.data!.docs.isNotEmpty) {
+                                            final data =
+                                                snapshot.data!.docs.first.data()
+                                                    as Map<String, dynamic>;
+                                            final status =
+                                                (data['status'] ?? '')
+                                                    .toString();
+
+                                            if (status == 'rejected') {
+                                              text = 'Proposta Recusada';
+                                              color = Colors.red.shade100;
+                                              textColor = Colors.red.shade900;
+                                            } else if (status == 'accepted') {
+                                              text = 'Proposta Aceita';
+                                              color = Colors.green.shade100;
+                                              textColor = Colors.green.shade900;
+                                            } else if (status ==
+                                                'adjustment_requested') {
+                                              text = 'Ajuste Solicitado';
+                                              color = Colors.amber.shade100;
+                                              textColor = Colors.amber.shade900;
+                                            }
                                           }
-                                        }
 
-                                        return Container(
-                                          padding: EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 4,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: color,
-                                            borderRadius: BorderRadius.circular(
-                                              12,
+                                          return Container(
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
                                             ),
-                                          ),
-                                          child: Text(
-                                            text,
-                                            style: TextStyle(
-                                              color: textColor,
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
+                                            decoration: BoxDecoration(
+                                              color: color,
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
                                             ),
-                                          ),
-                                        );
-                                      },
-                                    ),
+                                            child: Text(
+                                              text,
+                                              style: TextStyle(
+                                                color: textColor,
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
                                   ],
-                                ],
+                                ),
                               ),
+                              SizedBox(width: 8),
                               if (request.price != null && request.price! > 0)
                                 Text(
                                   'R\$ ${request.price!.toStringAsFixed(2)}',
@@ -953,6 +1011,8 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
     required bool isAvailable,
   }) {
     return Card(
+      color: Colors.white,
+      surfaceTintColor: Colors.white,
       elevation: 4,
       margin: EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1198,7 +1258,7 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
       case 'pending':
         return Colors.orange;
       case 'accepted':
-        return Color(0xFFDE3344);
+        return Colors.green;
       case 'completed':
         return Colors.green;
       case 'cancelled':
@@ -1645,6 +1705,7 @@ class _ProfessionalDrawer extends StatelessWidget {
     final professionalController = Get.find<ProfessionalController>();
 
     return Drawer(
+      backgroundColor: Colors.white,
       child: SafeArea(
         child: Obx(() {
           final user = authController.currentUser.value;
@@ -1695,7 +1756,7 @@ class _ProfessionalDrawer extends StatelessWidget {
                 title: Text('Notificações'),
                 onTap: () {
                   Get.back();
-                  // Navegar para notificações
+                  Get.toNamed(Routes.NOTIFICATIONS);
                 },
               ),
               ListTile(

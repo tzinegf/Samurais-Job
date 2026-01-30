@@ -69,158 +69,114 @@ class RegisterView extends GetView<RegisterController> {
               icon: Icons.lock_outline,
               isPassword: true,
             ),
+
             SizedBox(height: 24),
             Text(
-              'Você é:',
+              'Dados Profissionais',
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: Colors.black87,
               ),
             ),
-            SizedBox(height: 12),
-            Obx(
-              () => Row(
-                children: [
-                  Expanded(
-                    child: _buildRoleCard(
-                      label: 'Cliente',
-                      value: 'client',
-                      groupValue: controller.selectedRole.value,
-                      icon: Icons.person,
-                      onTap: () => controller.selectedRole.value = 'client',
-                    ),
-                  ),
-                  SizedBox(width: 16),
-                  Expanded(
-                    child: _buildRoleCard(
-                      label: 'Profissional',
-                      value: 'professional',
-                      groupValue: controller.selectedRole.value,
-                      icon: Icons.work,
-                      onTap: () =>
-                          controller.selectedRole.value = 'professional',
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            SizedBox(height: 16),
 
-            // Professional fields
             Obx(() {
-              if (controller.selectedRole.value == 'professional') {
+              if (controller.isLoadingCatalog.value) {
+                return Center(child: CircularProgressIndicator());
+              } else {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    SizedBox(height: 24),
-                    Divider(),
-                    SizedBox(height: 16),
-                    Text(
-                      'Dados Profissionais',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+                    // Category Dropdown
+                    DropdownButtonFormField<CategoryModel>(
+                      value: controller.selectedCategory.value,
+                      decoration: _inputDecoration(
+                        'Categoria Principal',
+                        Icons.category_outlined,
                       ),
+                      items: controller.categories.map((category) {
+                        return DropdownMenuItem(
+                          value: category,
+                          child: Text(category.name),
+                        );
+                      }).toList(),
+                      onChanged: controller.onCategorySelected,
                     ),
                     SizedBox(height: 16),
-                    if (controller.isLoadingCatalog.value)
-                      Center(child: CircularProgressIndicator())
-                    else ...[
-                      // Category Dropdown
-                      DropdownButtonFormField<CategoryModel>(
-                        value: controller.selectedCategory.value,
-                        decoration: _inputDecoration(
-                          'Categoria Principal',
-                          Icons.category_outlined,
-                        ),
-                        items: controller.categories.map((category) {
-                          return DropdownMenuItem(
-                            value: category,
-                            child: Text(category.name),
-                          );
-                        }).toList(),
-                        onChanged: controller.onCategorySelected,
-                      ),
-                      SizedBox(height: 16),
 
-                      // Subcategory Dropdown
-                      DropdownButtonFormField<SubcategoryModel>(
-                        value: controller.selectedSubcategory.value,
-                        decoration: _inputDecoration(
-                          'Subcategoria',
-                          Icons.subdirectory_arrow_right,
-                        ),
-                        items: controller.subcategories.map((subcategory) {
-                          return DropdownMenuItem(
-                            value: subcategory,
-                            child: Text(subcategory.name),
-                          );
-                        }).toList(),
-                        onChanged: controller.onSubcategorySelected,
+                    // Subcategory Dropdown
+                    DropdownButtonFormField<SubcategoryModel>(
+                      value: controller.selectedSubcategory.value,
+                      decoration: _inputDecoration(
+                        'Subcategoria',
+                        Icons.subdirectory_arrow_right,
                       ),
-                      SizedBox(height: 24),
+                      items: controller.subcategories.map((subcategory) {
+                        return DropdownMenuItem(
+                          value: subcategory,
+                          child: Text(subcategory.name),
+                        );
+                      }).toList(),
+                      onChanged: controller.onSubcategorySelected,
+                    ),
+                    SizedBox(height: 24),
 
-                      // Services Selection
-                      if (controller.services.isNotEmpty) ...[
-                        Text(
-                          'Selecione suas habilidades (Máx 5):',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
+                    // Services Selection
+                    if (controller.services.isNotEmpty) ...[
+                      Text(
+                        'Selecione suas habilidades (Máx 5):',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
                         ),
-                        SizedBox(height: 12),
-                        Wrap(
-                          spacing: 8.0,
-                          runSpacing: 8.0,
-                          children: controller.services.map((service) {
-                            return Obx(() {
-                              final isSelected = controller.selectedSkills
-                                  .contains(service.name);
-                              return FilterChip(
-                                label: Text(service.name),
-                                selected: isSelected,
-                                onSelected: (selected) {
-                                  controller.toggleSkill(service.name);
-                                },
-                                selectedColor: Color(
-                                  0xFFDE3344,
-                                ).withOpacity(0.1),
-                                checkmarkColor: Color(0xFFDE3344),
-                                labelStyle: TextStyle(
+                      ),
+                      SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8.0,
+                        runSpacing: 8.0,
+                        children: controller.services.map((service) {
+                          return Obx(() {
+                            final isSelected = controller.selectedSkills
+                                .contains(service.name);
+                            return FilterChip(
+                              label: Text(service.name),
+                              selected: isSelected,
+                              onSelected: (selected) {
+                                controller.toggleSkill(service.name);
+                              },
+                              selectedColor: Color(0xFFDE3344).withOpacity(0.1),
+                              checkmarkColor: Color(0xFFDE3344),
+                              labelStyle: TextStyle(
+                                color: isSelected
+                                    ? Color(0xFFDE3344)
+                                    : Colors.black87,
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
+                              backgroundColor: Colors.grey[100],
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                side: BorderSide(
                                   color: isSelected
                                       ? Color(0xFFDE3344)
-                                      : Colors.black87,
-                                  fontWeight: isSelected
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
+                                      : Colors.grey.shade300,
                                 ),
-                                backgroundColor: Colors.grey[100],
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                  side: BorderSide(
-                                    color: isSelected
-                                        ? Color(0xFFDE3344)
-                                        : Colors.grey.shade300,
-                                  ),
-                                ),
-                              );
-                            });
-                          }).toList(),
-                        ),
-                      ] else if (controller.selectedSubcategory.value !=
-                          null) ...[
-                        Text(
-                          'Nenhum serviço encontrado para esta subcategoria.',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ],
+                              ),
+                            );
+                          });
+                        }).toList(),
+                      ),
+                    ] else if (controller.selectedSubcategory.value !=
+                        null) ...[
+                      Text(
+                        'Nenhum serviço encontrado para esta subcategoria.',
+                        style: TextStyle(color: Colors.grey),
+                      ),
                     ],
                   ],
                 );
-              } else {
-                return SizedBox.shrink();
               }
             }),
 
@@ -300,51 +256,8 @@ class RegisterView extends GetView<RegisterController> {
         borderSide: BorderSide(color: Color(0xFFDE3344), width: 2),
       ),
       filled: true,
-      fillColor: Colors.grey[50],
+      fillColor: Colors.white,
       contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-    );
-  }
-
-  Widget _buildRoleCard({
-    required String label,
-    required String value,
-    required String groupValue,
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    final isSelected = value == groupValue;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: isSelected ? Color(0xFFDE3344).withOpacity(0.1) : Colors.white,
-          border: Border.all(
-            color: isSelected ? Color(0xFFDE3344) : Colors.grey.shade300,
-            width: 2,
-          ),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          children: [
-            Icon(
-              icon,
-              size: 32,
-              color: isSelected ? Color(0xFFDE3344) : Colors.grey,
-            ),
-            SizedBox(height: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: isSelected ? Color(0xFFDE3344) : Colors.grey,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

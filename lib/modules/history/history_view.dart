@@ -41,6 +41,8 @@ class HistoryView extends GetView<HistoryController> {
         itemBuilder: (context, index) {
           final request = controller.historyRequests[index];
           return Card(
+            color: Colors.white,
+            surfaceTintColor: Colors.white,
             margin: EdgeInsets.only(bottom: 12),
             child: ListTile(
               contentPadding: EdgeInsets.all(16),

@@ -62,10 +62,10 @@ class AuthController extends GetxController {
               .doc(user.uid)
               .snapshots()
               .listen((snapshot) {
-            if (snapshot.exists) {
-              currentUser.value = UserModel.fromDocument(snapshot);
-            }
-          });
+                if (snapshot.exists) {
+                  currentUser.value = UserModel.fromDocument(snapshot);
+                }
+              });
 
           // If on splash, don't redirect yet
           if (Get.currentRoute == Routes.SPLASH) return;
@@ -96,11 +96,18 @@ class AuthController extends GetxController {
     if (currentUser.value == null) return;
     String role = currentUser.value!.role;
     switch (role) {
-      case 'client':
-        Get.offAllNamed(Routes.DASHBOARD_CLIENT);
-        break;
       case 'professional':
         Get.offAllNamed(Routes.DASHBOARD_PROFESSIONAL);
+        break;
+      case 'client':
+        Get.snackbar(
+          "Atenção",
+          "Esse usuário está cadastrado como cliente, baixe o aplicativo do cliente para entrar.",
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+        );
+        await _auth.signOut();
+        Get.offAllNamed(Routes.LOGIN);
         break;
       case 'admin':
         Get.offAllNamed(Routes.DASHBOARD_ADMIN);
@@ -198,9 +205,6 @@ class AuthController extends GetxController {
 
       // Navegação manual pois o listener foi suprimido na tela de registro
       switch (userModel.role) {
-        case 'client':
-          Get.offAllNamed(Routes.DASHBOARD_CLIENT);
-          break;
         case 'professional':
           Get.offAllNamed(Routes.DASHBOARD_PROFESSIONAL);
           break;

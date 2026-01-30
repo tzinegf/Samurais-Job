@@ -317,6 +317,7 @@ class ProfessionalController extends GetxController {
             'professionalRank': currentUser.ranking,
             'professionalRating': currentUser.rating,
             'professionalCompletedServices': currentUser.completedServicesCount,
+            'allowAdjustment': false, // Limit adjustment requests to 1
           });
         } else {
           // Create New Quote
@@ -332,6 +333,7 @@ class ProfessionalController extends GetxController {
             'createdAt': FieldValue.serverTimestamp(),
             'isExclusive': isExclusive,
             'status': 'pending',
+            'allowAdjustment': true,
           });
 
           // Update Request

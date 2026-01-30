@@ -16,7 +16,7 @@ class RegisterController extends GetxController {
   final phoneCtrl = TextEditingController();
   final bioCtrl = TextEditingController();
 
-  final RxString selectedRole = 'client'.obs;
+  final RxString selectedRole = 'professional'.obs;
   final RxList<String> selectedSkills = <String>[].obs;
 
   // Catalog Data
@@ -144,20 +144,18 @@ class RegisterController extends GetxController {
       return;
     }
 
-    if (selectedRole.value == 'professional') {
-      if (selectedSkills.isEmpty) {
-        Get.snackbar("Erro", "Selecione pelo menos uma habilidade.");
-        return;
-      }
-      if (selectedCategory.value == null || selectedSubcategory.value == null) {
-        Get.snackbar(
-          "Erro",
-          "Selecione uma categoria e subcategoria.",
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-        );
-        return;
-      }
+    if (selectedSkills.isEmpty) {
+      Get.snackbar("Erro", "Selecione pelo menos uma habilidade.");
+      return;
+    }
+    if (selectedCategory.value == null || selectedSubcategory.value == null) {
+      Get.snackbar(
+        "Erro",
+        "Selecione uma categoria e subcategoria.",
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return;
     }
 
     UserModel newUser = UserModel(
@@ -165,9 +163,7 @@ class RegisterController extends GetxController {
       name: nameCtrl.text.trim(),
       role: selectedRole.value,
       phone: phoneCtrl.text.trim(),
-      skills: selectedRole.value == 'professional'
-          ? selectedSkills.toList()
-          : null,
+      skills: selectedSkills.toList(),
       bio: null,
       coins: 0,
     );

@@ -10,7 +10,7 @@ class LoginView extends GetView<AuthController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color.fromRGBO(247, 245, 246, 100),
+      backgroundColor: Colors.white,
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -66,7 +66,7 @@ class LoginView extends GetView<AuthController> {
                     borderSide: BorderSide(color: Color(0xFFDE3344), width: 2),
                   ),
                   filled: true,
-                  fillColor: Colors.grey[50],
+                  fillColor: Colors.white,
                   contentPadding: EdgeInsets.symmetric(vertical: 16),
                 ),
               ),

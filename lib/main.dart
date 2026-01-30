@@ -21,10 +21,21 @@ void main() async {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        colorSchemeSeed: Color(0xFFDE3344),
+        scaffoldBackgroundColor: Colors.white,
+        cardColor: Colors.white,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Color(0xFFDE3344),
+          surface: Colors.white,
+          surfaceTint: Colors.white, // Removes tint from cards in M3
+        ),
         appBarTheme: AppBarTheme(
           backgroundColor: Color(0xFFDE3344),
           foregroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+        ),
+        cardTheme: CardThemeData(
+          color: Colors.white,
+          surfaceTintColor: Colors.white,
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(

@@ -2,12 +2,10 @@ import 'package:get/get.dart';
 import '../modules/auth/auth_binding.dart';
 import '../modules/auth/login_view.dart';
 import '../modules/auth/register_view.dart';
-import '../modules/client_app/client/client_dashboard_view.dart';
 import '../modules/professional_app/professional/professional_dashboard_view.dart';
 import '../modules/admin/admin_dashboard_view.dart';
 import '../modules/moderator/moderator_dashboard_view.dart';
 import '../modules/professional_app/professional/professional_binding.dart';
-import '../modules/client_app/client/client_binding.dart';
 import '../modules/auth/register_binding.dart';
 import '../modules/chat/chat_binding.dart';
 import '../modules/chat/chat_view.dart';
@@ -20,6 +18,8 @@ import '../modules/profile/profile_controller.dart';
 import '../modules/professional_app/professional/settings/professional_settings_view.dart';
 import '../modules/professional_app/professional/settings/professional_settings_controller.dart';
 import '../modules/manifesto/manifesto_view.dart';
+import '../modules/notifications/notifications_view.dart';
+import '../modules/notifications/notifications_binding.dart';
 import '../modules/splash/splash_view.dart';
 import '../modules/splash/splash_controller.dart';
 import 'app_routes.dart';
@@ -40,11 +40,6 @@ class AppPages {
       name: Routes.REGISTER,
       page: () => RegisterView(),
       binding: RegisterBinding(),
-    ),
-    GetPage(
-      name: Routes.DASHBOARD_CLIENT,
-      page: () => ClientDashboardView(),
-      binding: ClientBinding(),
     ),
     GetPage(
       name: Routes.DASHBOARD_PROFESSIONAL,
@@ -84,5 +79,10 @@ class AppPages {
       }),
     ),
     GetPage(name: Routes.MANIFESTO, page: () => ManifestoView()),
+    GetPage(
+      name: Routes.NOTIFICATIONS,
+      page: () => NotificationsView(),
+      binding: NotificationsBinding(),
+    ),
   ];
 }

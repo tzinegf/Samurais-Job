@@ -40,9 +40,7 @@ class HistoryController extends GetxController {
 
       Query query = _db.collection('service_requests');
 
-      if (user.role == 'client') {
-        query = query.where('clientId', isEqualTo: user.id);
-      } else if (user.role == 'professional') {
+      if (user.role == 'professional') {
         query = query.where('professionalId', isEqualTo: user.id);
       }
 

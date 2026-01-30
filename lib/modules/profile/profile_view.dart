@@ -221,73 +221,71 @@ class ProfileView extends GetView<ProfileController> {
               SizedBox(height: 16),
 
               // Professional Specific Fields
-              if (user.role == 'professional') ...[
-                _buildProfessionalStats(user),
-                SizedBox(height: 24),
+              _buildProfessionalStats(user),
+              SizedBox(height: 24),
 
-                TextField(
-                  controller: controller.bioController,
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    labelText: 'Biografia Profissional',
-                    hintText: 'Conte um pouco sobre sua experiência...',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.description),
+              TextField(
+                controller: controller.bioController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  labelText: 'Biografia Profissional',
+                  hintText: 'Conte um pouco sobre sua experiência...',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.description),
+                ),
+              ),
+              SizedBox(height: 24),
+
+              Text(
+                'Habilidades',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 8),
+
+              // Add Skill Button (Catalog)
+              Obx(
+                () => ElevatedButton.icon(
+                  onPressed: controller.skills.length >= 5
+                      ? null
+                      : () => _showAddSkillDialog(context),
+                  icon: Icon(Icons.add),
+                  label: Text(
+                    controller.skills.length >= 5
+                        ? 'Limite de 5 habilidades atingido'
+                        : 'Adicionar Habilidade do Catálogo',
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFFDE3344),
+                    foregroundColor: Colors.white,
+                    minimumSize: Size(double.infinity, 48),
+                    disabledBackgroundColor: Colors.grey[300],
+                    disabledForegroundColor: Colors.grey[600],
                   ),
                 ),
-                SizedBox(height: 24),
+              ),
+              SizedBox(height: 16),
 
-                Text(
-                  'Habilidades',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              // Manual Entry (Optional, keeping for flexibility or removing if desired.
+              // User asked to search in categories, so catalog is primary.
+              // I'll keep manual as a secondary "Other" option if needed, but for now let's focus on the catalog button as requested)
+              Obx(
+                () => Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: controller.skills.map((skill) {
+                    return Chip(
+                      label: Text(skill),
+                      deleteIcon: Icon(Icons.close, size: 18),
+                      onDeleted: () => controller.removeSkill(skill),
+                      backgroundColor: Color(0xFFDE3344).withOpacity(0.1),
+                      side: BorderSide(
+                        color: Color(0xFFDE3344).withOpacity(0.3),
+                      ),
+                    );
+                  }).toList(),
                 ),
-                SizedBox(height: 8),
-
-                // Add Skill Button (Catalog)
-                Obx(
-                  () => ElevatedButton.icon(
-                    onPressed: controller.skills.length >= 5
-                        ? null
-                        : () => _showAddSkillDialog(context),
-                    icon: Icon(Icons.add),
-                    label: Text(
-                      controller.skills.length >= 5
-                          ? 'Limite de 5 habilidades atingido'
-                          : 'Adicionar Habilidade do Catálogo',
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(0xFFDE3344),
-                      foregroundColor: Colors.white,
-                      minimumSize: Size(double.infinity, 48),
-                      disabledBackgroundColor: Colors.grey[300],
-                      disabledForegroundColor: Colors.grey[600],
-                    ),
-                  ),
-                ),
-                SizedBox(height: 16),
-
-                // Manual Entry (Optional, keeping for flexibility or removing if desired.
-                // User asked to search in categories, so catalog is primary.
-                // I'll keep manual as a secondary "Other" option if needed, but for now let's focus on the catalog button as requested)
-                Obx(
-                  () => Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: controller.skills.map((skill) {
-                      return Chip(
-                        label: Text(skill),
-                        deleteIcon: Icon(Icons.close, size: 18),
-                        onDeleted: () => controller.removeSkill(skill),
-                        backgroundColor: Color(0xFFDE3344).withOpacity(0.1),
-                        side: BorderSide(
-                          color: Color(0xFFDE3344).withOpacity(0.3),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-                SizedBox(height: 24),
-              ],
+              ),
+              SizedBox(height: 24),
 
               SizedBox(height: 32),
 
