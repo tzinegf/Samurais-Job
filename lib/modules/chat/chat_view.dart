@@ -8,7 +8,16 @@ class ChatView extends GetView<ChatController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Obx(() => Text(controller.requestTitle.value))),
+      appBar: AppBar(
+        title: Obx(
+          () => Text(
+            controller.partnerName.value.isNotEmpty
+                ? 'Conversando com: ${controller.partnerName.value}'
+                : controller.requestTitle.value,
+            style: TextStyle(fontSize: 16),
+          ),
+        ),
+      ),
       body: Column(
         children: [
           Expanded(
@@ -58,12 +67,16 @@ class ChatView extends GetView<ChatController> {
             if (!isMe)
               Padding(
                 padding: const EdgeInsets.only(bottom: 4.0),
-                child: Text(
-                  message.senderName,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                    color: Colors.black54,
+                child: Obx(
+                  () => Text(
+                    controller.partnerName.value.isNotEmpty
+                        ? controller.partnerName.value
+                        : message.senderName,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      color: Colors.black54,
+                    ),
                   ),
                 ),
               ),

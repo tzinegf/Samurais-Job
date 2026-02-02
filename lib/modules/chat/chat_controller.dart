@@ -7,12 +7,15 @@ import '../../models/chat_message_model.dart';
 
 class ChatController extends GetxController {
   final String requestId = Get.arguments['requestId'];
-  late RxString requestTitle = (Get.arguments['requestTitle'] as String? ?? 'Chat').obs;
+  late RxString requestTitle =
+      (Get.arguments['requestTitle'] as String? ?? 'Chat').obs;
+  RxString partnerName = ''.obs;
   final TextEditingController messageController = TextEditingController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   String? receiverId;
+  String? currentUserName;
   RxList<ChatMessageModel> messages = <ChatMessageModel>[].obs;
 
   @override
@@ -28,7 +31,10 @@ class ChatController extends GetxController {
 
   Future<void> _fetchRequestTitle() async {
     try {
-      final doc = await _firestore.collection('service_requests').doc(requestId).get();
+      final doc = await _firestore
+          .collection('service_requests')
+          .doc(requestId)
+          .get();
       if (doc.exists) {
         requestTitle.value = doc.data()?['title'] ?? 'Chat';
       }
@@ -92,12 +98,48 @@ class ChatController extends GetxController {
           );
         } else {
           print('DEBUG: Receiver identificado: $receiverId');
+          _fetchReceiverName(receiverId!);
         }
       } else {
         print('DEBUG: Request doc não encontrado.');
       }
     } catch (e) {
       print('Erro ao identificar receiver: $e');
+    }
+  }
+
+  Future<void> _fetchReceiverName(String targetUserId) async {
+    try {
+      final doc = await _firestore.collection('users').doc(targetUserId).get();
+      if (doc.exists) {
+        final data = doc.data();
+        String name = data?['name'] ?? data?['email'] ?? 'Usuário';
+
+        // Format name: First name only, First letter uppercase
+        if (name.isNotEmpty) {
+          // If it looks like an email, take part before @
+          if (name.contains('@')) {
+            name = name.split('@')[0];
+          }
+
+          final parts = name.trim().split(RegExp(r'\s+'));
+          if (parts.isNotEmpty) {
+            final firstName = parts.first;
+            if (firstName.isNotEmpty) {
+              name =
+                  firstName[0].toUpperCase() +
+                  firstName.substring(1).toLowerCase();
+            }
+          }
+        }
+
+        partnerName.value = name;
+      } else {
+        partnerName.value = 'Usuário';
+      }
+    } catch (e) {
+      print('Erro ao buscar nome do receiver: $e');
+      partnerName.value = '...';
     }
   }
 
@@ -150,8 +192,12 @@ class ChatController extends GetxController {
     final message = messageController.text.trim();
     messageController.clear();
 
-    // Tenta obter o nome do usuário do Firebase Auth
-    String senderName = user.displayName ?? user.email ?? 'Usuário';
+    // Use fetched name or fallback
+    String senderName =
+        currentUserName ??
+        user.displayName ??
+        user.email?.split('@')[0] ??
+        'Usuário';
 
     print('DEBUG: Enviando mensagem para receiverId: $receiverId');
 
