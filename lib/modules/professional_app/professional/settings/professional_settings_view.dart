@@ -37,8 +37,8 @@ class ProfessionalSettingsView extends GetView<ProfessionalSettingsController> {
                   Slider(
                     value: controller.serviceRadius.value,
                     min: 1.0,
-                    max: 100.0,
-                    divisions: 99,
+                    max: 30.0,
+                    divisions: 29,
                     label: '${controller.serviceRadius.value.round()} km',
                     activeColor: Color(0xFFDE3344),
                     onChanged: controller.updateServiceRadius,

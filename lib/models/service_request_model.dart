@@ -34,6 +34,7 @@ class ServiceRequestModel {
   // Location
   double? latitude;
   double? longitude;
+  String? geohash;
 
   ServiceRequestModel({
     this.id,
@@ -63,6 +64,7 @@ class ServiceRequestModel {
     this.adjustmentRequestsCount = 0,
     this.latitude,
     this.longitude,
+    this.geohash,
   });
 
   factory ServiceRequestModel.fromDocument(DocumentSnapshot doc) {
@@ -105,6 +107,7 @@ class ServiceRequestModel {
       longitude: (data['longitude'] is int)
           ? (data['longitude'] as int).toDouble()
           : (data['longitude'] as double?),
+      geohash: data['geohash'],
     );
   }
 
@@ -137,6 +140,7 @@ class ServiceRequestModel {
       'professionalProblemDescription': professionalProblemDescription,
       'latitude': latitude,
       'longitude': longitude,
+      'geohash': geohash,
     };
   }
 }

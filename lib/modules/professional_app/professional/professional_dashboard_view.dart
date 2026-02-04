@@ -11,6 +11,7 @@ import '../../history/history_view.dart';
 import 'professional_controller.dart';
 import '../../auth/auth_controller.dart';
 import '../../shared/mini_map_viewer.dart';
+import '../../../utils/content_validator.dart';
 import '../../../services/notification_service.dart';
 
 ImageProvider? _getAvatarImage(String? avatarUrl) {
@@ -42,6 +43,7 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
               SliverAppBar(
                 floating: false,
                 pinned: true,
+                centerTitle: true,
                 title: Text('Painel do Profissional'),
                 actions: [
                   Stack(
@@ -526,7 +528,20 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
       text: request.price?.toStringAsFixed(2) ?? '',
     );
     final descriptionController = TextEditingController();
+    final selectedDeadline = RxnString();
     final isExclusive = false.obs;
+
+    final List<String> deadlineOptions = [
+      'Imediato',
+      '1 dia',
+      '2 dias',
+      '3 dias',
+      '5 dias',
+      '1 semana',
+      '15 dias',
+      '1 mês',
+      'A combinar',
+    ];
 
     Get.dialog(
       Dialog(
@@ -564,6 +579,26 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
                 ),
                 SizedBox(height: 12),
                 Obx(
+                  () => DropdownButtonFormField<String>(
+                    decoration: InputDecoration(
+                      labelText: 'Prazo de Execução',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.timer_outlined),
+                    ),
+                    value: selectedDeadline.value,
+                    items: deadlineOptions.map((String value) {
+                      return DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(value),
+                      );
+                    }).toList(),
+                    onChanged: (newValue) {
+                      selectedDeadline.value = newValue;
+                    },
+                  ),
+                ),
+                SizedBox(height: 12),
+                Obx(
                   () => SwitchListTile(
                     title: Text(
                       'Orçamento Exclusivo',
@@ -596,6 +631,7 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
                                   priceController.text.replaceAll(',', '.'),
                                 );
                                 final desc = descriptionController.text.trim();
+                                final deadline = selectedDeadline.value;
 
                                 if (price == null || price <= 0) {
                                   Get.snackbar(
@@ -613,11 +649,36 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
                                   return;
                                 }
 
+                                if (deadline == null || deadline.isEmpty) {
+                                  Get.snackbar(
+                                    'Erro',
+                                    'Selecione o prazo de execução.',
+                                  );
+                                  return;
+                                }
+
+                                // Validate Content
+                                final validation = ContentValidator.validate(
+                                  desc,
+                                );
+                                if (!validation.isValid) {
+                                  Get.snackbar(
+                                    'Conteúdo Proibido',
+                                    validation.errorMessage ??
+                                        'Conteúdo não permitido no orçamento.',
+                                    backgroundColor: Colors.red,
+                                    colorText: Colors.white,
+                                    duration: Duration(seconds: 5),
+                                  );
+                                  return;
+                                }
+
                                 controller.sendQuote(
                                   request,
                                   price,
                                   desc,
                                   isExclusive.value,
+                                  deadline,
                                 );
                               },
                         style: ElevatedButton.styleFrom(
@@ -986,20 +1047,47 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
 
   Widget _buildMyRequests() {
     return Obx(() {
-      final inProgressRequests = controller.myRequests
-          .where((r) => r.status == 'accepted')
+      // Filter to show only 'accepted' requests (Active Jobs)
+      // Completed and Cancelled should be in History
+      final myRequests = controller.myRequests
+          .where((req) => req.status == 'accepted')
           .toList();
 
-      if (inProgressRequests.isEmpty) {
-        return Center(child: Text('Nenhum serviço em andamento.'));
+      if (myRequests.isEmpty) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.assignment_outlined, size: 64, color: Colors.grey),
+              SizedBox(height: 16),
+              Text('Nenhum serviço em andamento.'),
+            ],
+          ),
+        );
       }
 
       return ListView.builder(
-        itemCount: inProgressRequests.length,
+        itemCount: myRequests.length,
         padding: EdgeInsets.all(16),
         itemBuilder: (context, index) {
-          final request = inProgressRequests[index];
-          return _buildServiceCard(context, request, isAvailable: false);
+          final request = myRequests[index];
+
+          final currentUserId =
+              Get.find<AuthController>().currentUser.value?.id;
+
+          // Since we filter only 'accepted', status is always 'Aceito'
+          // and professionalId check is redundant if controller filters by ID,
+          // but we keep the logic for safety or future changes.
+          String statusDisplay = 'Aceito (Em Andamento)';
+          Color statusColor = Colors.green;
+
+          return _buildServiceCard(
+            context,
+            request,
+            isAvailable: false,
+            customStatusText: statusDisplay,
+            customStatusColor: statusColor,
+          );
         },
       );
     });
@@ -1009,6 +1097,8 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
     BuildContext context,
     ServiceRequestModel request, {
     required bool isAvailable,
+    String? customStatusText,
+    Color? customStatusColor,
   }) {
     return Card(
       color: Colors.white,
@@ -1027,56 +1117,69 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Color(0xFFDE3344).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          _getIconForCategory(request.category),
-                          color: Color(0xFFDE3344),
-                          size: 20,
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        request.category,
-                        style: TextStyle(
-                          color: Colors.grey[700],
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      if (request.subcategory != null) ...[
-                        SizedBox(width: 8),
+                  Expanded(
+                    child: Row(
+                      children: [
                         Container(
-                          width: 4,
-                          height: 4,
+                          padding: EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.grey[400],
+                            color: Color(0xFFDE3344).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            _getIconForCategory(request.category),
+                            color: Color(0xFFDE3344),
+                            size: 20,
                           ),
                         ),
                         SizedBox(width: 8),
-                        Text(
-                          request.subcategory!,
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 13,
+                        Flexible(
+                          child: Text(
+                            request.category,
+                            style: TextStyle(
+                              color: Colors.grey[700],
+                              fontWeight: FontWeight.w500,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        if (request.subcategory != null) ...[
+                          SizedBox(width: 8),
+                          Container(
+                            width: 4,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.grey[400],
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              request.subcategory!,
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 13,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                   if (!isAvailable)
                     Builder(
                       builder: (context) {
-                        String statusText = _translateStatus(request.status);
-                        Color statusColor = _getStatusColor(request.status);
+                        String statusText =
+                            customStatusText ??
+                            _translateStatus(request.status);
+                        Color statusColor =
+                            customStatusColor ??
+                            _getStatusColor(request.status);
 
-                        if (request.status == 'completed' &&
+                        if (customStatusText == null &&
+                            request.status == 'completed' &&
                             request.rating == null) {
                           statusText = 'Aguardando Avaliação';
                           statusColor = Colors.orange;
@@ -1147,6 +1250,65 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(color: Colors.grey[800], height: 1.3),
               ),
+              SizedBox(height: 8),
+              if (isAvailable) ...[
+                Row(
+                  children: [
+                    Icon(Icons.people_outline, size: 16, color: Colors.grey),
+                    SizedBox(width: 4),
+                    Text(
+                      'Orçamentos: ${request.quoteCount}/3',
+                      style: TextStyle(
+                        color: request.quoteCount >= 3
+                            ? Colors.red
+                            : Colors.grey[700],
+                        fontWeight: request.quoteCount >= 3
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
+                    ),
+                    if (request.quoteCount >= 3)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 8.0),
+                        child: Text(
+                          '(Limite atingido)',
+                          style: TextStyle(color: Colors.red, fontSize: 12),
+                        ),
+                      ),
+                  ],
+                ),
+                SizedBox(height: 8),
+              ],
+              if (controller.currentFilter.value == 'nearest' &&
+                  controller.currentPosition.value != null &&
+                  request.latitude != null &&
+                  request.longitude != null) ...[
+                SizedBox(height: 8),
+                Builder(
+                  builder: (context) {
+                    final Distance distance = Distance();
+                    final dist = distance.as(
+                      LengthUnit.Kilometer,
+                      controller.currentPosition.value!,
+                      LatLng(request.latitude!, request.longitude!),
+                    );
+                    return Row(
+                      children: [
+                        Icon(
+                          Icons.location_on_outlined,
+                          size: 16,
+                          color: Colors.blue,
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          'Aprox. ${dist.toStringAsFixed(1)} km',
+                          style: TextStyle(color: Colors.blue),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ],
               SizedBox(height: 12),
               Divider(),
               Row(
@@ -1166,7 +1328,9 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
                   ),
                   if (isAvailable)
                     ElevatedButton.icon(
-                      onPressed: () => _showQuoteDialog(context, request),
+                      onPressed: request.quoteCount >= 3
+                          ? null // Disable if limit reached
+                          : () => _showQuoteDialog(context, request),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Color(0xFFDE3344),
                         foregroundColor: Colors.white,
@@ -1175,11 +1339,15 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
                           vertical: 8,
                         ),
                         textStyle: TextStyle(fontSize: 12),
+                        disabledBackgroundColor: Colors.grey[300],
+                        disabledForegroundColor: Colors.grey[600],
                       ),
                       icon: Icon(Icons.send, size: 16),
                       label: Text('Orçar'),
                     )
-                  else if (request.status == 'accepted')
+                  else if (request.status == 'accepted' &&
+                      request.professionalId ==
+                          Get.find<AuthController>().currentUser.value?.id)
                     ElevatedButton.icon(
                       onPressed: () => Get.toNamed(
                         Routes.CHAT,
@@ -1488,9 +1656,9 @@ class _ProfessionalHeader extends StatelessWidget {
         padding: EdgeInsets.all(16),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFFDE3344), Color(0xFFFF6B6B)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+            colors: [Color(0xFFDE3344), const Color.fromARGB(255, 0, 0, 0)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
           ),
         ),
         child: Column(

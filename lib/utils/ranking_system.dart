@@ -98,20 +98,7 @@ class RankingSystem {
   }
 
   static Color getRankColor(RankingLevel level) {
-    switch (level) {
-      case RankingLevel.ronin:
-        return Colors.grey;
-      case RankingLevel.ashigaru:
-        return Colors.brown;
-      case RankingLevel.bushi:
-        return Color(0xFF000555);
-      case RankingLevel.hatamoto:
-        return Colors.amber;
-      case RankingLevel.daimyo:
-        return Colors.deepPurple;
-      case RankingLevel.shogun:
-        return Colors.redAccent;
-    }
+    return Colors.amber;
   }
 
   static IconData getRankIcon(RankingLevel level) {

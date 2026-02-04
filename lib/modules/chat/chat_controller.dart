@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../utils/content_validator.dart';
 import '../../models/chat_message_model.dart';
 
 class ChatController extends GetxController {
@@ -176,7 +177,22 @@ class ChatController extends GetxController {
   }
 
   Future<void> sendMessage() async {
-    if (messageController.text.trim().isEmpty) return;
+    final message = messageController.text.trim();
+    if (message.isEmpty) return;
+
+    // Validate Content
+    final validation = ContentValidator.validate(message);
+    if (!validation.isValid) {
+      Get.snackbar(
+        'Conteúdo Proibido',
+        validation.errorMessage ?? 'Conteúdo não permitido.',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.TOP,
+        duration: Duration(seconds: 4),
+      );
+      return;
+    }
 
     final user = _auth.currentUser;
     if (user == null) return;
@@ -189,7 +205,9 @@ class ChatController extends GetxController {
       await _identifyReceiver();
     }
 
-    final message = messageController.text.trim();
+    // Clear controller after validation and before sending (or after?)
+    // Better to clear only if successful? But user experience usually expects immediate clear.
+    // However, if we validated above, we are good to go.
     messageController.clear();
 
     // Use fetched name or fallback

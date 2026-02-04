@@ -1,16 +1,24 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:dart_geohash/dart_geohash.dart';
+import '../../auth/auth_controller.dart';
 import '../../../models/service_request_model.dart';
 import '../../../utils/ranking_system.dart';
-import '../../auth/auth_controller.dart';
+import 'settings/professional_settings_controller.dart';
+import '../../../utils/content_validator.dart';
 
 class ProfessionalController extends GetxController {
   final AuthController _authController = Get.find<AuthController>();
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final ProfessionalSettingsController _settingsController =
+      Get.find<ProfessionalSettingsController>();
+
+  StreamSubscription? _requestsSubscription;
 
   RxList<ServiceRequestModel> _allPendingRequests = <ServiceRequestModel>[].obs;
   RxList<ServiceRequestModel> availableRequests = <ServiceRequestModel>[].obs;
@@ -21,6 +29,12 @@ class ProfessionalController extends GetxController {
   RxString currentFilter = 'recent'.obs; // 'recent', 'nearest', 'price_desc'
   Rx<LatLng?> currentPosition = Rx<LatLng?>(null);
   String? _previousRank;
+
+  @override
+  void onClose() {
+    _requestsSubscription?.cancel();
+    super.onClose();
+  }
 
   @override
   void onInit() {
@@ -42,7 +56,10 @@ class ProfessionalController extends GetxController {
 
     ever(_allPendingRequests, (_) => _filterRequests());
     ever(currentFilter, (_) => _filterRequests());
-    ever(currentPosition, (_) => _filterRequests());
+
+    // Re-fetch when position or radius changes to update Geohash query
+    ever(currentPosition, (_) => fetchAvailableRequests());
+    ever(_settingsController.serviceRadius, (_) => fetchAvailableRequests());
 
     fetchAvailableRequests();
     fetchMyRequests();
@@ -121,6 +138,25 @@ class ProfessionalController extends GetxController {
       filtered = _allPendingRequests.toList();
     }
 
+    // Filter by Radius (Strict)
+    if (currentPosition.value != null) {
+      final double radiusMeters =
+          _settingsController.serviceRadius.value * 1000;
+      final Distance distance = Distance();
+
+      filtered = filtered.where((req) {
+        if (req.latitude == null || req.longitude == null) return false;
+
+        final dist = distance.as(
+          LengthUnit.Meter,
+          currentPosition.value!,
+          LatLng(req.latitude!, req.longitude!),
+        );
+
+        return dist <= radiusMeters;
+      }).toList();
+    }
+
     // Apply Sorting
     switch (currentFilter.value) {
       case 'nearest':
@@ -185,26 +221,56 @@ class ProfessionalController extends GetxController {
   }
 
   void fetchAvailableRequests() {
-    // Realtime listener for pending requests
-    _db
+    _requestsSubscription?.cancel();
+
+    Query query = _db
         .collection('service_requests')
-        .where('status', isEqualTo: 'pending')
-        .snapshots()
-        .listen(
-          (snapshot) {
-            _allPendingRequests.value = snapshot.docs
-                .map((doc) => ServiceRequestModel.fromDocument(doc))
-                .toList();
-          },
-          onError: (e) {
-            Get.snackbar(
-              "Erro",
-              "Falha ao carregar pedidos: $e",
-              backgroundColor: Colors.red,
-              colorText: Colors.white,
-            );
-          },
+        .where('status', isEqualTo: 'pending');
+
+    if (currentPosition.value != null) {
+      double radius = _settingsController.serviceRadius.value;
+
+      // Determine precision based on radius
+      // Precision 5 is approx 4.9km x 4.9km. Neighbors cover ~15km x 15km.
+      // Precision 4 is approx 39km x 19km. Neighbors cover ~120km x 60km.
+      int precision = 4;
+      if (radius <= 10) {
+        precision = 5;
+      } else if (radius <= 50) {
+        precision = 4;
+      } else {
+        precision = 3;
+      }
+
+      final hasher = GeoHasher();
+      final myGeohash = hasher.encode(
+        currentPosition.value!.latitude,
+        currentPosition.value!.longitude,
+        precision: precision,
+      );
+
+      final neighborsMap = hasher.neighbors(myGeohash);
+      final neighbors = neighborsMap.values.toList();
+      neighbors.add(myGeohash);
+
+      query = query.where('geohash', whereIn: neighbors);
+    }
+
+    _requestsSubscription = query.snapshots().listen(
+      (snapshot) {
+        _allPendingRequests.value = snapshot.docs
+            .map((doc) => ServiceRequestModel.fromDocument(doc))
+            .toList();
+      },
+      onError: (e) {
+        Get.snackbar(
+          "Erro",
+          "Falha ao carregar pedidos: $e",
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
         );
+      },
+    );
   }
 
   void fetchMyRequests() {
@@ -230,6 +296,7 @@ class ProfessionalController extends GetxController {
     double price,
     String description,
     bool isExclusive,
+    String deadline,
   ) async {
     try {
       isLoading.value = true;
@@ -241,6 +308,19 @@ class ProfessionalController extends GetxController {
           'Usuário não identificado.',
           backgroundColor: Colors.red,
           colorText: Colors.white,
+        );
+        return;
+      }
+
+      // Validation: Content Blocking (Email, Phone, Links)
+      final validation = ContentValidator.validate(description);
+      if (!validation.isValid) {
+        Get.snackbar(
+          'Conteúdo Bloqueado',
+          validation.errorMessage ?? 'Conteúdo não permitido.',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          duration: Duration(seconds: 4),
         );
         return;
       }
@@ -258,6 +338,16 @@ class ProfessionalController extends GetxController {
       final existingQuoteDoc = existingQuoteQuery.docs.isNotEmpty
           ? existingQuoteQuery.docs.first
           : null;
+
+      if (existingQuoteDoc != null) {
+        Get.snackbar(
+          'Aviso',
+          'Você já enviou um orçamento para este pedido.',
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+        );
+        return; // Prevent multiple quotes (or editing if business rule forbids)
+      }
 
       // If updating, we don't charge coins again
       final cost = (isExclusive && existingQuoteDoc == null)
@@ -291,9 +381,9 @@ class ProfessionalController extends GetxController {
         }
 
         if (existingQuoteDoc == null &&
-            currentQuoteCount >= 4 &&
+            currentQuoteCount >= 3 &&
             !isExclusive) {
-          throw Exception("Limite de 4 orçamentos atingido para este pedido.");
+          throw Exception("Limite de 3 orçamentos atingido para este pedido.");
         }
 
         if (cost > 0) {
@@ -306,68 +396,46 @@ class ProfessionalController extends GetxController {
           transaction.update(userRef, {'coins': currentCoins - cost});
         }
 
-        if (existingQuoteDoc != null) {
-          // Update Existing Quote
-          transaction.update(existingQuoteDoc.reference, {
-            'price': price,
-            'description': description,
-            'isExclusive': isExclusive,
-            'status': 'pending', // Reset status to pending (Waiting for client)
-            'updatedAt': FieldValue.serverTimestamp(),
-            'professionalRank': currentUser.ranking,
-            'professionalRating': currentUser.rating,
-            'professionalCompletedServices': currentUser.completedServicesCount,
-            'allowAdjustment': false, // Limit adjustment requests to 1
-          });
-        } else {
-          // Create New Quote
-          final newQuoteRef = quotesRef.doc();
-          transaction.set(newQuoteRef, {
-            'professionalId': currentUser.id,
-            'professionalName': currentUser.name,
-            'professionalRank': currentUser.ranking,
-            'professionalRating': currentUser.rating,
-            'professionalCompletedServices': currentUser.completedServicesCount,
-            'price': price,
-            'description': description,
-            'createdAt': FieldValue.serverTimestamp(),
-            'isExclusive': isExclusive,
-            'status': 'pending',
-            'allowAdjustment': true,
-          });
+        // Create New Quote
+        final newQuoteRef = quotesRef.doc();
+        transaction.set(newQuoteRef, {
+          'professionalId': currentUser.id,
+          'professionalName': currentUser.name,
+          'professionalRank': currentUser.ranking,
+          'professionalRating': currentUser.rating,
+          'professionalCompletedServices': currentUser.completedServicesCount,
+          'price': price,
+          'description': description,
+          'deadline': deadline,
+          'createdAt': FieldValue.serverTimestamp(),
+          'isExclusive': isExclusive,
+          'status': 'pending',
+          'requestId': request.id, // Ensure requestId is saved
+        });
 
-          // Update Request
-          Map<String, dynamic> updateData = {
-            'quoteCount': currentQuoteCount + 1,
-            'quotedBy': FieldValue.arrayUnion([currentUser.id]),
-          };
-
-          if (isExclusive) {
-            updateData['isExclusive'] = true;
-            updateData['exclusiveProfessionalId'] = currentUser.id;
-          }
-
-          transaction.update(requestRef, updateData);
-        }
+        // Update Request
+        transaction.update(requestRef, {
+          'quoteCount': FieldValue.increment(1),
+          if (isExclusive) 'isExclusive': true,
+          if (isExclusive) 'exclusiveProfessionalId': currentUser.id,
+          'quotedBy': FieldValue.arrayUnion([currentUser.id]),
+        });
       });
 
-      // Refresh local data
-      fetchAvailableRequests();
-      fetchMyRequests();
-
-      Get.back(); // Close dialog
+      Get.back(); // Close details
       Get.snackbar(
-        'Sucesso',
-        existingQuoteDoc != null
-            ? 'Orçamento atualizado com sucesso!'
-            : 'Orçamento enviado com sucesso! ($cost moedas debitadas)',
+        "Sucesso",
+        "Orçamento enviado com sucesso!",
         backgroundColor: Colors.green,
         colorText: Colors.white,
       );
+
+      // Update local stats or fetch again
+      // _authController.currentUser.refresh(); // Not needed if real-time listener works
     } catch (e) {
       Get.snackbar(
-        'Erro',
-        'Falha ao enviar orçamento: $e',
+        "Erro",
+        "Erro ao enviar orçamento: $e",
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -511,12 +579,26 @@ class ProfessionalController extends GetxController {
 
   // Temporary helper to create a dummy request for testing
   Future<void> createDummyRequest() async {
+    // Generate random location near center or current position
+    double lat = -23.55052;
+    double lng = -46.633309;
+
+    if (currentPosition.value != null) {
+      lat = currentPosition.value!.latitude;
+      lng = currentPosition.value!.longitude;
+    }
+
+    final geohash = GeoHasher().encode(lat, lng, precision: 6);
+
     var request = ServiceRequestModel(
       clientId: 'dummy_client_id',
       title: 'Reparo de Encanamento',
       description: 'Vazamento na pia da cozinha',
       category: 'Encanador',
       price: 150.0,
+      latitude: lat,
+      longitude: lng,
+      geohash: geohash,
     );
     await _db.collection('service_requests').add(request.toJson());
   }

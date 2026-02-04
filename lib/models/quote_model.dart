@@ -13,6 +13,7 @@ class QuoteModel {
   double? professionalRating;
   int? professionalCompletedServices;
   DateTime? createdAt;
+  String? deadline; // Prazo de execução (ex: "2 dias", "1 semana")
 
   QuoteModel({
     this.id,
@@ -27,6 +28,7 @@ class QuoteModel {
     this.professionalRating,
     this.professionalCompletedServices,
     this.createdAt,
+    this.deadline,
   });
 
   factory QuoteModel.fromDocument(DocumentSnapshot doc) {
@@ -48,6 +50,7 @@ class QuoteModel {
           : (data['professionalRating'] as double?),
       professionalCompletedServices: data['professionalCompletedServices'],
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+      deadline: data['deadline'],
     );
   }
 
@@ -64,6 +67,7 @@ class QuoteModel {
       'professionalRating': professionalRating,
       'professionalCompletedServices': professionalCompletedServices,
       'createdAt': createdAt ?? FieldValue.serverTimestamp(),
+      'deadline': deadline,
     };
   }
 }

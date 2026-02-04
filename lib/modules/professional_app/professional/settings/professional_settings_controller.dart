@@ -14,7 +14,10 @@ class ProfessionalSettingsController extends GetxController {
   Future<void> loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     notificationsEnabled.value = prefs.getBool('notifications_enabled') ?? true;
-    serviceRadius.value = prefs.getDouble('service_radius') ?? 10.0;
+    
+    double radius = prefs.getDouble('service_radius') ?? 10.0;
+    if (radius > 30.0) radius = 30.0; // Enforce max limit
+    serviceRadius.value = radius;
   }
 
   Future<void> toggleNotifications(bool value) async {

@@ -10,6 +10,12 @@ class HistoryController extends GetxController {
   final AuthController _authController = Get.find<AuthController>();
 
   RxList<ServiceRequestModel> historyRequests = <ServiceRequestModel>[].obs;
+  
+  // Categorized lists
+  RxList<ServiceRequestModel> completedRequests = <ServiceRequestModel>[].obs;
+  RxList<ServiceRequestModel> refusedRequests = <ServiceRequestModel>[].obs;
+  RxList<ServiceRequestModel> cancelledRequests = <ServiceRequestModel>[].obs;
+
   RxBool isLoading = false.obs;
 
   StreamSubscription? _historySubscription;
@@ -41,11 +47,15 @@ class HistoryController extends GetxController {
       Query query = _db.collection('service_requests');
 
       if (user.role == 'professional') {
-        query = query.where('professionalId', isEqualTo: user.id);
+        // Fetch all requests where I was involved (sent a quote)
+        query = query.where('quotedBy', arrayContains: user.id);
+      } else {
+        // Client logic (kept for compatibility, though this controller seems professional-focused)
+        query = query.where('clientId', isEqualTo: user.id);
       }
 
-      // Filter for completed or cancelled
-      query = query.where('status', whereIn: ['completed', 'cancelled']);
+      // Filter for non-pending statuses
+      query = query.where('status', whereIn: ['accepted', 'completed', 'cancelled']);
 
       _historySubscription = query.snapshots().listen(
         (snapshot) {
@@ -61,6 +71,8 @@ class HistoryController extends GetxController {
           });
 
           historyRequests.assignAll(requests);
+          _categorizeRequests(requests, user.id ?? '');
+          
           isLoading.value = false;
         },
         onError: (e) {
@@ -78,6 +90,35 @@ class HistoryController extends GetxController {
       print("Error setting up history listener: $e");
       isLoading.value = false;
     }
+  }
+
+  void _categorizeRequests(List<ServiceRequestModel> requests, String userId) {
+    final completed = <ServiceRequestModel>[];
+    final refused = <ServiceRequestModel>[];
+    final cancelled = <ServiceRequestModel>[];
+
+    for (var req in requests) {
+      if (req.professionalId == userId) {
+        // I was the chosen professional
+        if (req.status == 'completed') {
+          completed.add(req);
+        } else if (req.status == 'cancelled') {
+          cancelled.add(req);
+        }
+        // 'accepted' is active, handled in Dashboard, not History
+      } else {
+        // I was NOT the chosen professional (but I quoted)
+        // This means I was refused/not selected
+        // Even if status is 'accepted' (active for someone else) or 'cancelled' (cancelled before or after selection of someone else)
+        // or 'completed' (by someone else).
+        // Essentially, if I am not the pro, it's a "Recusado" for me.
+        refused.add(req);
+      }
+    }
+
+    completedRequests.assignAll(completed);
+    refusedRequests.assignAll(refused);
+    cancelledRequests.assignAll(cancelled);
   }
 
   String translateStatus(String status) {
