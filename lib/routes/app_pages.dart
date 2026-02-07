@@ -22,6 +22,7 @@ import '../modules/notifications/notifications_view.dart';
 import '../modules/notifications/notifications_binding.dart';
 import '../modules/splash/splash_view.dart';
 import '../modules/splash/splash_controller.dart';
+import '../modules/professional_app/ranking/ranking_details_view.dart';
 import 'app_routes.dart';
 
 class AppPages {
@@ -84,5 +85,6 @@ class AppPages {
       page: () => NotificationsView(),
       binding: NotificationsBinding(),
     ),
+    GetPage(name: Routes.RANKING_DETAILS, page: () => RankingDetailsView()),
   ];
 }

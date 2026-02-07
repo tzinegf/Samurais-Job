@@ -44,7 +44,7 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
                 floating: false,
                 pinned: true,
                 centerTitle: true,
-                title: Text('Painel do Profissional'),
+                title: Text('Painel do Samurai'),
                 actions: [
                   Stack(
                     children: [
@@ -719,6 +719,19 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
             children: [
               Obx(
                 () => FilterChip(
+                  label: Text('Urgente'),
+                  selected: controller.currentFilter.value == 'urgency_high',
+                  onSelected: (bool selected) {
+                    if (selected)
+                      controller.currentFilter.value = 'urgency_high';
+                  },
+                  selectedColor: Color(0xFFDE3344).withOpacity(0.1),
+                  checkmarkColor: Color(0xFFDE3344),
+                ),
+              ),
+              SizedBox(width: 8),
+              Obx(
+                () => FilterChip(
                   label: Text('Mais Recentes'),
                   selected: controller.currentFilter.value == 'recent',
                   onSelected: (bool selected) {
@@ -856,6 +869,8 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
                                             MaterialTapTargetSize.shrinkWrap,
                                       ),
                                     ],
+                                    if (request.urgency != null)
+                                      _buildUrgencyBadge(request.urgency!),
                                     if (request.quotedBy.contains(
                                       Get.find<AuthController>()
                                           .currentUser
@@ -1377,6 +1392,81 @@ class ProfessionalDashboardView extends GetView<ProfessionalController> {
     );
   }
 
+  Widget _buildUrgencyBadge(String urgency) {
+    Color color;
+    String text;
+    IconData icon;
+    String tooltip;
+
+    final cleanUrgency = urgency.toLowerCase().trim();
+
+    if (cleanUrgency.contains('quanto antes') ||
+        cleanUrgency == 'immediate' ||
+        cleanUrgency == 'urgente' ||
+        cleanUrgency == 'imediato') {
+      color = Colors.red;
+      text = 'Urgente';
+      icon = Icons.warning_amber_rounded;
+      tooltip = 'Quanto antes melhor';
+    } else if (cleanUrgency.contains('5 dias')) {
+      color = Colors.deepOrange;
+      text = 'Imediato';
+      icon = Icons.priority_high_rounded;
+      tooltip = 'Nos próximos 5 dias';
+    } else if (cleanUrgency.contains('15 dias') ||
+        cleanUrgency == 'high' ||
+        cleanUrgency == 'alta' ||
+        cleanUrgency == 'alto') {
+      color = Colors.orange;
+      text = 'Alta';
+      icon = Icons.schedule;
+      tooltip = 'Nos próximos 15 dias';
+    } else if (cleanUrgency.contains('30 dias') ||
+        cleanUrgency.contains('medium') ||
+        cleanUrgency.contains('media') ||
+        cleanUrgency.contains('média') ||
+        cleanUrgency.contains('medio') ||
+        cleanUrgency.contains('médio')) {
+      color = Colors.blue;
+      text = 'Média';
+      icon = Icons.calendar_today;
+      tooltip = 'Nos próximos 30 dias';
+    } else {
+      // Default / Low / Sem data
+      color = Colors.green;
+      text = 'Baixa';
+      icon = Icons.low_priority;
+      tooltip = 'Sem data definida';
+    }
+
+    return Tooltip(
+      message: tooltip,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(0.5)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 12, color: color),
+            SizedBox(width: 4),
+            Text(
+              text.toUpperCase(),
+              style: TextStyle(
+                color: color,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   IconData _getIconForCategory(String category) {
     switch (category) {
       case 'Marceneiro':
@@ -1726,7 +1816,7 @@ class _ProfessionalHeader extends StatelessWidget {
                         children: [
                           Icon(Icons.star, color: Colors.amber, size: 16),
                           Text(
-                            ' ${user.rating.toStringAsFixed(1)} (${user.ratingCount})',
+                            ' ${user.rating.toStringAsFixed(1)} (${user.ratingCount.toStringAsFixed(0)})',
                             style: TextStyle(
                               color: Colors.white70,
                               fontSize: 12,
@@ -1742,6 +1832,15 @@ class _ProfessionalHeader extends StatelessWidget {
                             ),
                           ),
                         ],
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'O rating é calculado com base na sua trajetória e avaliações reais.',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.6),
+                          fontSize: 10,
+                          fontStyle: FontStyle.italic,
+                        ),
                       ),
                     ],
                   ),
@@ -1783,7 +1882,15 @@ class _ProfessionalHeader extends StatelessWidget {
                       ),
                     ),
                     SizedBox(height: 12),
-                    Image.asset(rankImage, height: 80, fit: BoxFit.contain),
+                    InkWell(
+                      onTap: () => Get.toNamed(Routes.RANKING_DETAILS),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.asset(
+                        rankImage,
+                        height: 80,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -1791,49 +1898,53 @@ class _ProfessionalHeader extends StatelessWidget {
             SizedBox(height: 16),
 
             // Ranking Quote & Progress
-            Container(
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withOpacity(0.2)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    rankQuote,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontStyle: FontStyle.italic,
-                      fontSize: 12,
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        nextLevelText,
-                        style: TextStyle(color: Colors.white70, fontSize: 10),
+            InkWell(
+              onTap: () => Get.toNamed(Routes.RANKING_DETAILS),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withOpacity(0.2)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      rankQuote,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontStyle: FontStyle.italic,
+                        fontSize: 12,
                       ),
-                      Text(
-                        '${(progress * 100).toInt()}%',
-                        style: TextStyle(color: Colors.white70, fontSize: 10),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 4),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      backgroundColor: Colors.white24,
-                      valueColor: AlwaysStoppedAnimation<Color>(rankColor),
-                      minHeight: 6,
                     ),
-                  ),
-                ],
+                    SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          nextLevelText,
+                          style: TextStyle(color: Colors.white70, fontSize: 10),
+                        ),
+                        Text(
+                          '${(progress * 100).toInt()}%',
+                          style: TextStyle(color: Colors.white70, fontSize: 10),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 4),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        backgroundColor: Colors.white24,
+                        valueColor: AlwaysStoppedAnimation<Color>(rankColor),
+                        minHeight: 6,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
 

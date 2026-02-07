@@ -9,6 +9,9 @@ import 'package:dart_geohash/dart_geohash.dart';
 import '../../auth/auth_controller.dart';
 import '../../../models/service_request_model.dart';
 import '../../../utils/ranking_system.dart';
+import '../../../utils/rating_system.dart';
+import '../../../models/rating_history_model.dart';
+import '../../../models/user_model.dart';
 import 'settings/professional_settings_controller.dart';
 import '../../../utils/content_validator.dart';
 
@@ -26,7 +29,8 @@ class ProfessionalController extends GetxController {
   RxBool isLoading = false.obs;
 
   // Filtering and Location
-  RxString currentFilter = 'recent'.obs; // 'recent', 'nearest', 'price_desc'
+  RxString currentFilter =
+      'recent'.obs; // 'recent', 'nearest', 'price_desc', 'urgency_high'
   Rx<LatLng?> currentPosition = Rx<LatLng?>(null);
   String? _previousRank;
 
@@ -64,6 +68,96 @@ class ProfessionalController extends GetxController {
     fetchAvailableRequests();
     fetchMyRequests();
     getCurrentLocation();
+    _processPendingRatings();
+  }
+
+  /// Checks for completed service requests that haven't been processed for rating calculation yet.
+  /// This ensures the professional's rating is updated even if the client app didn't trigger a cloud function.
+  void _processPendingRatings() async {
+    final user = _authController.currentUser.value;
+    if (user == null) return;
+
+    try {
+      // 1. Get all completed requests for this professional
+      final snapshot = await _db
+          .collection('service_requests')
+          .where('professionalId', isEqualTo: user.id)
+          .where('status', isEqualTo: 'completed')
+          .get();
+
+      for (var doc in snapshot.docs) {
+        final request = ServiceRequestModel.fromDocument(doc);
+
+        // Skip if client hasn't rated yet
+        if (request.rating == null) continue;
+
+        // 2. Check if this rating has already been processed
+        final historyQuery = await _db
+            .collection('rating_history')
+            .where('requestId', isEqualTo: request.id!)
+            .limit(1)
+            .get();
+
+        if (historyQuery.docs.isNotEmpty) continue;
+
+        // 3. Process the new rating
+        await _processSingleRating(request, user);
+      }
+    } catch (e) {
+      print("Error processing pending ratings: $e");
+    }
+  }
+
+  Future<void> _processSingleRating(
+    ServiceRequestModel request,
+    UserModel user,
+  ) async {
+    try {
+      await _db.runTransaction((transaction) async {
+        final userRef = _db.collection('users').doc(user.id);
+        final userDoc = await transaction.get(userRef);
+
+        if (!userDoc.exists) return;
+
+        final currentUserData = UserModel.fromDocument(userDoc);
+
+        // Calculate New Rating
+        final result = RatingSystem.calculateNewRating(
+          currentRating: currentUserData.rating,
+          currentEffectiveCount: currentUserData.ratingCount, // Now a double
+          newRatingValue: request.rating!,
+          rank: currentUserData.ranking,
+        );
+
+        // Create History Entry
+        final historyEntry = RatingHistoryModel(
+          professionalId: user.id!,
+          clientId: request.clientId,
+          requestId: request.id!,
+          oldRating: currentUserData.rating,
+          newRating: result.newRating,
+          givenRating: request.rating!,
+          processedRating: result.processedGivenRating,
+          professionalRank: currentUserData.ranking,
+          timestamp: DateTime.now(),
+        );
+
+        // Update User
+        transaction.update(userRef, {
+          'rating': result.newRating,
+          'ratingCount': result.newRatingCount,
+        });
+
+        // Add History
+        final historyRef = _db.collection('rating_history').doc();
+        transaction.set(historyRef, historyEntry.toJson());
+      });
+
+      // Refresh user data
+      _authController.currentUser.refresh();
+    } catch (e) {
+      print("Error processing single rating transaction: $e");
+    }
   }
 
   void _showRankChangeNotification(String newRank, String oldRank) {
@@ -187,6 +281,13 @@ class ProfessionalController extends GetxController {
       case 'price_desc':
         filtered.sort((a, b) => (b.price ?? 0).compareTo(a.price ?? 0));
         break;
+      case 'urgency_high':
+        filtered.sort((a, b) {
+          final weightA = _getUrgencyWeight(a.urgency);
+          final weightB = _getUrgencyWeight(b.urgency);
+          return weightB.compareTo(weightA); // Descending (Immediate first)
+        });
+        break;
       case 'recent':
       default:
         filtered.sort(
@@ -198,6 +299,102 @@ class ProfessionalController extends GetxController {
     }
 
     availableRequests.value = filtered;
+  }
+
+  Future<void> normalizeUrgencyValues() async {
+    try {
+      final snapshot = await _db.collection('service_requests').get();
+      final batch = _db.batch();
+      int count = 0;
+
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final currentUrgency = data['urgency'] as String?;
+        String? newUrgency;
+
+        switch (currentUrgency?.toLowerCase().trim()) {
+          case 'immediate':
+          case 'urgente':
+          case 'imediato':
+            newUrgency = 'quanto antes melhor';
+            break;
+          case 'high':
+          case 'alta':
+          case 'alto':
+            newUrgency = 'nos próximos 15 dias';
+            break;
+          case 'medium':
+          case 'media':
+          case 'média':
+          case 'medio':
+          case 'médio':
+            newUrgency = 'nos próximos 30 dias';
+            break;
+          case 'low':
+          case 'baixa':
+          case 'baixo':
+            newUrgency = 'sem data definida';
+            break;
+        }
+
+        if (newUrgency != null && newUrgency != currentUrgency) {
+          batch.update(doc.reference, {'urgency': newUrgency});
+          count++;
+        }
+      }
+
+      if (count > 0) {
+        await batch.commit();
+        Get.snackbar(
+          'Sucesso',
+          '$count pedidos atualizados para o novo padrão de urgência.',
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
+      } else {
+        Get.snackbar(
+          'Info',
+          'Nenhum pedido precisou ser atualizado.',
+          backgroundColor: Colors.blue,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      Get.snackbar(
+        'Erro',
+        'Falha ao normalizar urgências: $e',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
+  }
+
+  int _getUrgencyWeight(String? urgency) {
+    final cleanUrgency = urgency?.toLowerCase().trim() ?? '';
+
+    if (cleanUrgency.contains('quanto antes') ||
+        cleanUrgency == 'immediate' ||
+        cleanUrgency == 'urgente' ||
+        cleanUrgency == 'imediato') {
+      return 5;
+    } else if (cleanUrgency.contains('5 dias')) {
+      return 4;
+    } else if (cleanUrgency.contains('15 dias') ||
+        cleanUrgency == 'high' ||
+        cleanUrgency == 'alta' ||
+        cleanUrgency == 'alto') {
+      return 3;
+    } else if (cleanUrgency.contains('30 dias') ||
+        cleanUrgency.contains('medium') ||
+        cleanUrgency.contains('media') ||
+        cleanUrgency.contains('média') ||
+        cleanUrgency.contains('medio') ||
+        cleanUrgency.contains('médio')) {
+      return 2;
+    } else {
+      // Default / Low / Sem data
+      return 1;
+    }
   }
 
   Future<void> getCurrentLocation() async {
@@ -227,16 +424,23 @@ class ProfessionalController extends GetxController {
         .collection('service_requests')
         .where('status', isEqualTo: 'pending');
 
+    // Removed Geohash filter because of precision mismatch issues.
+    // If requests are saved with high precision (e.g. 9 chars) and we query with low precision (e.g. 4 chars),
+    // the 'whereIn' equality check fails.
+    // Until we implement multi-precision geohashes in the database, we fetch all pending requests
+    // and filter strictly by distance locally in _filterRequests.
+    /*
     if (currentPosition.value != null) {
       double radius = _settingsController.serviceRadius.value;
 
       // Determine precision based on radius
-      // Precision 5 is approx 4.9km x 4.9km. Neighbors cover ~15km x 15km.
-      // Precision 4 is approx 39km x 19km. Neighbors cover ~120km x 60km.
-      int precision = 4;
-      if (radius <= 10) {
+      // Precision 5 (~4.9km cell): Neighbors cover ~15km. Safe for radius <= 5km.
+      // Precision 4 (~19.5km cell): Neighbors cover ~60km. Safe for radius <= 20km.
+      // Precision 3 (~156km cell): Neighbors cover ~450km. Safe for radius > 20km.
+      int precision = 3;
+      if (radius <= 5) {
         precision = 5;
-      } else if (radius <= 50) {
+      } else if (radius <= 20) {
         precision = 4;
       } else {
         precision = 3;
@@ -255,6 +459,7 @@ class ProfessionalController extends GetxController {
 
       query = query.where('geohash', whereIn: neighbors);
     }
+    */
 
     _requestsSubscription = query.snapshots().listen(
       (snapshot) {
@@ -589,6 +794,14 @@ class ProfessionalController extends GetxController {
     }
 
     final geohash = GeoHasher().encode(lat, lng, precision: 6);
+    final urgencies = [
+      'quanto antes melhor',
+      'nos próximos 5 dias',
+      'nos próximos 15 dias',
+      'nos próximos 30 dias',
+      'sem data definida',
+    ];
+    final randomUrgency = urgencies[DateTime.now().millisecond % 5];
 
     var request = ServiceRequestModel(
       clientId: 'dummy_client_id',
@@ -599,6 +812,7 @@ class ProfessionalController extends GetxController {
       latitude: lat,
       longitude: lng,
       geohash: geohash,
+      urgency: randomUrgency,
     );
     await _db.collection('service_requests').add(request.toJson());
   }

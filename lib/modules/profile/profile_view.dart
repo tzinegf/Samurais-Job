@@ -346,10 +346,19 @@ class ProfileView extends GetView<ProfileController> {
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  ' (${user.ratingCount} avaliações)',
+                  ' (${user.ratingCount.toStringAsFixed(0)} avaliações)',
                   style: TextStyle(color: Colors.grey[600]),
                 ),
               ],
+            ),
+            SizedBox(height: 4),
+            Text(
+              'O rating é calculado com base na sua trajetória e avaliações reais.',
+              style: TextStyle(
+                color: Colors.grey[500],
+                fontSize: 11,
+                fontStyle: FontStyle.italic,
+              ),
             ),
             SizedBox(height: 12),
             Row(

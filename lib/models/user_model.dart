@@ -18,7 +18,7 @@ class UserModel {
   List<String>? skills;
   int coins;
   double rating;
-  int ratingCount;
+  double ratingCount; // Changed to double to support fractional weights
   int completedServicesCount;
   int cancellationCount;
   String ranking; // ronin, ashigaru, bushi, hatamoto, daimyo, shogun
@@ -41,7 +41,7 @@ class UserModel {
     this.skills,
     this.coins = 0,
     this.rating = 0.0,
-    this.ratingCount = 0,
+    this.ratingCount = 0.0,
     this.completedServicesCount = 0,
     this.cancellationCount = 0,
     this.ranking = 'ronin',
@@ -71,7 +71,9 @@ class UserModel {
       rating: (data['rating'] is int)
           ? (data['rating'] as int).toDouble()
           : (data['rating'] ?? 0.0).toDouble(),
-      ratingCount: data['ratingCount'] ?? 0,
+      ratingCount: (data['ratingCount'] is int)
+          ? (data['ratingCount'] as int).toDouble()
+          : (data['ratingCount'] ?? 0.0).toDouble(),
       completedServicesCount: data['completedServicesCount'] ?? 0,
       cancellationCount: data['cancellationCount'] ?? 0,
       ranking: data['ranking'] ?? 'ronin',

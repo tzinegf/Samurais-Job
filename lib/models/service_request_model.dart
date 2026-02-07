@@ -35,6 +35,7 @@ class ServiceRequestModel {
   double? latitude;
   double? longitude;
   String? geohash;
+  String? urgency; // low, medium, high, immediate
 
   ServiceRequestModel({
     this.id,
@@ -65,6 +66,7 @@ class ServiceRequestModel {
     this.latitude,
     this.longitude,
     this.geohash,
+    this.urgency,
   });
 
   factory ServiceRequestModel.fromDocument(DocumentSnapshot doc) {
@@ -108,6 +110,7 @@ class ServiceRequestModel {
           ? (data['longitude'] as int).toDouble()
           : (data['longitude'] as double?),
       geohash: data['geohash'],
+      urgency: data['urgency'],
     );
   }
 
@@ -141,6 +144,7 @@ class ServiceRequestModel {
       'latitude': latitude,
       'longitude': longitude,
       'geohash': geohash,
+      'urgency': urgency,
     };
   }
 }

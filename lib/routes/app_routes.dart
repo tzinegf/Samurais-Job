@@ -12,4 +12,5 @@ abstract class Routes {
   static const PROFESSIONAL_SETTINGS = '/professional-settings';
   static const NOTIFICATIONS = '/notifications';
   static const MANIFESTO = '/manifesto';
+  static const RANKING_DETAILS = '/ranking-details';
 }

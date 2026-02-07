@@ -166,6 +166,7 @@ class RegisterController extends GetxController {
       skills: selectedSkills.toList(),
       bio: null,
       coins: 0,
+      rating: 3.0,
     );
 
     _authController.registerUser(newUser, passwordCtrl.text);
