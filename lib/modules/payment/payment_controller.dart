@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_custom_tabs/flutter_custom_tabs.dart';
+import 'package:url_launcher/url_launcher.dart' as url_launcher;
 import '../../services/payment_service.dart';
 import '../auth/auth_controller.dart';
 
@@ -48,48 +49,37 @@ class PaymentController extends GetxController {
       );
 
       if (initPoint != null) {
-        // 2. Launch Checkout
-        final uri = Uri.parse(initPoint);
-
-        bool launched = false;
+        // 2. Launch Checkout using Custom Tabs
         try {
-          // Force external application (Browser) which is best for Payments
-          launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-        } on PlatformException catch (e) {
-          print("Erro de Plataforma (Plugin): $e");
-          Get.defaultDialog(
-            title: "Erro de Configuração",
-            content: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                "O plugin de navegação não está respondendo corretamente.\n\nIsso geralmente acontece após atualizações. Por favor, reinicie o aplicativo (pare e execute novamente).",
-                textAlign: TextAlign.center,
+          await launchUrl(
+            Uri.parse(initPoint),
+            customTabsOptions: CustomTabsOptions(
+              colorSchemes: CustomTabsColorSchemes.defaults(
+                toolbarColor: Color(0xFFDE3344),
+              ),
+              shareState: CustomTabsShareState.on,
+              urlBarHidingEnabled: true,
+              showTitle: true,
+              closeButton: CustomTabsCloseButton(
+                icon: CustomTabsCloseButtonIcons.back,
               ),
             ),
-            textConfirm: "OK",
-            confirmTextColor: Colors.white,
-            onConfirm: () => Get.back(),
+            safariVCOptions: SafariViewControllerOptions(
+              preferredBarTintColor: Color(0xFFDE3344),
+              preferredControlTintColor: Colors.white,
+              barCollapsingEnabled: true,
+              entersReaderIfAvailable: false,
+              dismissButtonStyle: SafariViewControllerDismissButtonStyle.close,
+            ),
           );
-          isLoading.value = false;
-          return;
-        } catch (e) {
-          print("Erro ao lançar URL: $e");
-          // Try platform default as last resort
-          try {
-            launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
-          } catch (e2) {
-            print("Erro fallback URL: $e2");
-          }
-        }
 
-        if (launched) {
-          // 3. Temporarily show a dialog to confirm manual check
+          // 3. Show confirmation dialog
           Get.defaultDialog(
             title: "Pagamento em Processamento",
             content: Padding(
               padding: const EdgeInsets.all(16.0),
               child: Text(
-                "Você será redirecionado para o Mercado Pago.\n\nApós concluir o pagamento, clique em 'Confirmar' para validar suas moedas.",
+                "Após concluir o pagamento, clique em 'Confirmar' para validar suas moedas.",
                 textAlign: TextAlign.center,
               ),
             ),
@@ -103,8 +93,18 @@ class PaymentController extends GetxController {
               await addCoins(coins);
             },
           );
-        } else {
-          Get.snackbar('Erro', 'Não foi possível abrir o link de pagamento.');
+        } catch (e) {
+          print("Erro ao abrir Custom Tab: $e");
+          // Fallback para navegador padrão se Custom Tabs falhar
+          final uri = Uri.parse(initPoint);
+          if (await url_launcher.canLaunchUrl(uri)) {
+            await url_launcher.launchUrl(
+              uri,
+              mode: url_launcher.LaunchMode.externalApplication,
+            );
+          } else {
+            Get.snackbar('Erro', 'Não foi possível abrir o pagamento.');
+          }
         }
       }
     } catch (e) {

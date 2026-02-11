@@ -1,11 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+import '../config/payment_secrets.dart';
+
 class PaymentService {
-  // TODO: Crie uma conta no Mercado Pago Developers e pegue seu Access Token de Teste:
-  // https://www.mercadopago.com.br/developers/panel
-  static const String ACCESS_TOKEN =
-      'APP_USR-1657234746865481-012314-0aa90914870337a9a801f9611f6c33ef-3154275773';
+  // Access Token movido para lib/config/payment_secrets.dart
 
   Future<String?> createPreference({
     required String title,
@@ -13,7 +12,9 @@ class PaymentService {
     required int quantity,
     required String email,
   }) async {
-    if (ACCESS_TOKEN == 'YOUR_ACCESS_TOKEN_HERE') {
+    final accessToken = PaymentSecrets.accessToken;
+
+    if (accessToken == 'YOUR_ACCESS_TOKEN_HERE' || accessToken.isEmpty) {
       print('ERRO: Access Token do Mercado Pago não configurado.');
       return null;
     }
@@ -30,6 +31,16 @@ class PaymentService {
         },
       ],
       "payer": {"email": email},
+      "binary_mode": true,
+
+      "payment_methods": {
+        "payment_method_id": "pix",
+        "installments": 6,
+        "excluded_payment_types": [
+          {"id": "ticket"},
+        ],
+      },
+      "statement_descriptor": "SAMURAIJOB",
       "back_urls": {
         "success": "samuraisjob://payment-success",
         "failure": "samuraisjob://payment-failure",
@@ -41,14 +52,14 @@ class PaymentService {
     try {
       print('Enviando requisição para Mercado Pago...');
       print(
-        'Token (final 4): ...${ACCESS_TOKEN.trim().substring(ACCESS_TOKEN.length - 4)}',
+        'Token (final 4): ...${accessToken.trim().substring(accessToken.length - 4)}',
       );
 
       final response = await http.post(
         url,
         headers: {
           "Content-Type": "application/json",
-          "Authorization": "Bearer ${ACCESS_TOKEN.trim()}",
+          "Authorization": "Bearer ${accessToken.trim()}",
         },
         body: jsonEncode(body),
       );
